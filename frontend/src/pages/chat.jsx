@@ -17,11 +17,19 @@ function Chat() {
     const { user } = useAuth();
     const socket = useSocket();
     const messageendref = useRef(null);
+    const [typingusers, settypingusers] = useState([]);
+    const [istyping, setistyping] = useState(false)
+    const typingtimeout = useRef(null);
+    
 
     const room = [user._id, contactid].sort().join('_');
 
     useEffect(() => {
         socket.emit("joinroom", room);
+
+        socket.on("singleusertyping", ({ userids }) => {
+            settypingusers(userids)
+        })
 
         fetchmessages();
 
@@ -33,12 +41,13 @@ function Chat() {
         return () => {
             socket.emit("leaveroom", room)
             socket.off("recivemessage")
+            socket.off("singleusertyping")
         }
     }, [contactid])
 
     useEffect(() => {
         messageendref.current?.scrollIntoView({ behavior: "smooth" })
-    }, [messages])
+    }, [messages, typingusers])
 
     const fetchmessages = async () => {
         try {
@@ -61,12 +70,38 @@ function Chat() {
 
                 socket.emit("sendmessage", { room, message })
                 setnewmessage("")
+                handletyping(false)
             } catch (error) {
                 console.log(error);
             }
         }
 
     }
+
+
+    const handletyping = (iscurrentlytyping) => {
+        clearTimeout(typingtimeout.current);
+
+        if (iscurrentlytyping && !istyping) {
+            socket.emit("singletypingstart", room)
+            setistyping(true)
+        } else if (!iscurrentlytyping && istyping) {
+            socket.emit("singletypingstop", room)
+            setistyping(false)
+        }
+
+
+        if (iscurrentlytyping) {
+            typingtimeout.current = setTimeout(() => {
+                handletyping(false)
+            }, 2000);
+        }
+    }
+
+
+      useEffect(() => {
+            clearTimeout(typingtimeout.current)
+        },[])
 
     return (
         <div className='p-6 flex flex-col h-screen'>
@@ -83,9 +118,40 @@ function Chat() {
                 <div ref={messageendref} />
             </div>
 
+            {
+            typingusers.length > 0 && (
+                <div className='flex items-center p-2 text-gray-500 italic'>
+                     <div className='flex space-x-1 mr-2'>
+                       {
+                        [0,1,2].map((i) => (
+                            <div key={i} className='typing-dot'
+                            style={{animationDelay: `${i*0.2}s`}}
+                            />
+                        ))
+                       }
+                     </div>
+                     <span className=''>
+                        {
+                            typingusers.length === 1 ? `typing...` : ``
+                        }
+                     </span>
+                </div>
+            )
+        }
+
             <div className='sticky bottom-0 pt-4 pb-6 bg-white'>
                 <div className='flex '>
-                    <Input autoFocus value={newmessage} placeholder="Type a message..." className="mr-4" onChange={(e) => setnewmessage(e.target.value)} onKeyPress={(e) => e.key === "Enter" && sendmessage()} />
+                    <Input autoFocus value={newmessage} placeholder="Type a message..." className="mr-4" onChange={(e) => {
+                        setnewmessage(e.target.value)
+                        handletyping(e.target.value.length > 0)
+                    }}
+                        onKeyPress={(e) => e.key === "Enter" && sendmessage()}
+
+                        onBlur={() => {
+                            handletyping(false)
+                        }}
+
+                    />
                     <Button onClick={sendmessage}>Send</Button>
                 </div>
             </div>

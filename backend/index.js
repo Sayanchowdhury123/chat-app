@@ -59,9 +59,35 @@ io.use(async (socket,next) => {
 })
 
 const typingusers = new Map();
+const singletypingusers = new Map();
 
 io.on("connection", (socket) => {
     console.log("user connected");
+
+    socket.on("singletypingstart", (room) => {
+        const userid = socket.userid;
+        if(!singletypingusers.has(room)){
+            singletypingusers.set(room, new Set())
+        }
+        singletypingusers.get(room).add(userid)
+        socket.to(room).emit("singleusertyping", {
+            room,
+            userids: Array.from(singletypingusers.get(room))
+        })
+
+    })
+
+
+    socket.on("singletypingstop", (room) => {
+        const userid = socket.userid;
+        if(singletypingusers.has(room)){
+            singletypingusers.get(room).delete(userid)
+            socket.to(room).emit("singleusertyping", {
+                room,
+                userids: Array.from(singletypingusers.get(room))
+            })
+        }
+    })
 
 
 
@@ -77,6 +103,8 @@ io.on("connection", (socket) => {
         })
 
     })
+
+ 
 
 
     socket.on("typingstop", (groupid) => {
