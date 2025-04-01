@@ -63,7 +63,7 @@ const onlineusers = new Map();
 io.on("connection", (socket) => {
     console.log("user connected");
   
-
+//online 
   socket.on("set-online", (userid) => {
        onlineusers.set(userid, Date.now());
        io.emit("online-users", Object.fromEntries(onlineusers))
@@ -198,7 +198,7 @@ io.on("connection", (socket) => {
     })
 
    
-
+//offline
     socket.on("disconnect", () => {
        console.log("user disconnected", socket.id);
        if(socket.userid){
