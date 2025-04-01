@@ -105,7 +105,7 @@ function Chat() {
 
     return (
         <div className='p-6 flex flex-col h-screen'>
-            <h1 className='text-2xl font-bold mb-6'>Chat</h1>
+            <h1 className='text-2xl font-bold mb-6'>Chat </h1>
             <div className='mb-4 flex-1 overflow-y-auto'>
                 {
                     messages.map((msg) => (

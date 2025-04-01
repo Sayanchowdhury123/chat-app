@@ -12,7 +12,8 @@ const jwt = require("jsonwebtoken");
 const User = require("./models/User");
 const Group = require("./models/Groupchats");
 const path = require("path");
-const { group } = require("console");
+const { arrayBuffer } = require("stream/consumers");
+
 
 dotenv.config();
 const app = express();
@@ -47,10 +48,7 @@ io.use(async (socket,next) => {
         if(!token) throw new Error("no token provided")
 
             const decoded = jwt.verify(token,process.env.TOKEN);
-            const user = await User.findById(decoded.user.id);
-            if(!user) throw new Error("no user found")
-
-                socket.userid = user._id;
+              socket.userid = decoded.user.id;
                 next();
 
     } catch (error) {
@@ -60,9 +58,20 @@ io.use(async (socket,next) => {
 
 const typingusers = new Map();
 const singletypingusers = new Map();
+const onlineusers = new Map();
 
 io.on("connection", (socket) => {
     console.log("user connected");
+  
+
+  socket.on("set-online", (userid) => {
+       onlineusers.set(userid, Date.now());
+       io.emit("online-users", Object.fromEntries(onlineusers))
+      
+  })
+
+
+  
 
     socket.on("singletypingstart", (room) => {
         const userid = socket.userid;
@@ -143,7 +152,7 @@ io.on("connection", (socket) => {
             await newmessage.save();
             
 
-            console.log(`message recived in room ${room}`, message);
+           
         io.to(room).emit("recivemessage", newmessage);
         } catch (error) {
             console.log(error);
@@ -191,7 +200,15 @@ io.on("connection", (socket) => {
    
 
     socket.on("disconnect", () => {
-       console.log("user discoonected", socket.id);
+       console.log("user disconnected", socket.id);
+       if(socket.userid){
+        onlineusers.delete(socket.userid);
+        io.emit("online-users", Object.fromEntries(onlineusers))
+        
+       }
+      
+   
+      
     })
 })
 
