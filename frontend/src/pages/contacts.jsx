@@ -22,6 +22,8 @@ const {user} = useAuth();
 const Socket = useSocket();
 const[onlineusers,setonlineusers] = useState({});
 
+
+//for online/offline status
 useEffect(() => {
   
 Socket.emit("set-online", user._id)
