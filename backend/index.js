@@ -59,10 +59,60 @@ io.use(async (socket,next) => {
 const typingusers = new Map();
 const singletypingusers = new Map();
 const onlineusers = new Map();
+const readrecipts = new Map();
+const readreciptsgroup = new Map();
 
 io.on("connection", (socket) => {
     console.log("user connected");
+
+//read recipt
+socket.on("markasread",  ({messageids,readerid,room}) => {
+  console.log(messageids)
+    messageids.forEach((messageid) => {
+        if(!readrecipts.has(messageid)){
+            readrecipts.set(messageid, new Set())
+        }
+        readrecipts.get(messageid).add(readerid)
+    
+        io.to(room).emit("readupdate", {
+           messageid,
+           readby: Array.from( readrecipts.get(messageid))
+        })
+
+        
+    })
+
+   
+})
+
+//read recipt group
+socket.on("markasread-group",  ({messageids,readerid,groupid}) => {
+    
+      messageids.forEach((messageid) => {
+          if(!readreciptsgroup.has(messageid)){
+              readreciptsgroup.set(messageid, new Set())
+          }
+          readreciptsgroup.get(messageid).add(readerid)
+      
+          io.to(`group_${groupid}`).emit("readupdate-group", {
+             messageid,
+             readby: Array.from( readreciptsgroup.get(messageid))
+          })
+
+           
+      })
   
+  })
+
+
+
+
+
+
+
+ 
+ 
+
 //online 
   socket.on("set-online", (userid) => {
        onlineusers.set(userid, Date.now());
@@ -184,7 +234,7 @@ io.on("connection", (socket) => {
             await newmessage.save();
 
             const populatedmsg = await Groupmessages.populate(newmessage,{ path:"sender", select: "username"})
-
+            console.log(populatedmsg);
             io.to(`group_${groupid}`).emit("recivegroupmessage", populatedmsg)
 
         } catch (error) {

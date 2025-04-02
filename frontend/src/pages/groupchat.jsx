@@ -17,6 +17,7 @@ function Groupchat() {
     const[typingusers,settypingusers] = useState([]);
     const[istyping,setistyping] = useState(false)
     const typingtimeout = useRef(null);
+     const [readrecipts, setreadrecipts] = useState({})
 
 
     useEffect(() => {
@@ -35,6 +36,14 @@ function Groupchat() {
         }
         fetchdata();
 
+
+       //read recipt
+       socket.on("readupdate-group", ({ messageid, readby }) => {
+        setreadrecipts(prev => ({ ...prev, [messageid.toString()]: readby }))
+       
+    })
+
+
         socket.on("usertyping", ({userids}) => {
             settypingusers(userids)
         })
@@ -47,10 +56,41 @@ function Groupchat() {
             socket.emit("leavegroup", groupid)
             socket.off("recivegroupmessage")
             socket.off("usertyping")
+            socket.off("readupdate-group")
            
         }
 
-    }, [groupid])
+    }, [groupid,socket])
+
+
+  useEffect(() => {
+  
+       const unreadmessages = messages.filter(msg => msg.sender._id.toString() !== user._id && !readrecipts[msg._id.toString()]?.includes(user._id))
+          if (unreadmessages.length > 0) {
+              socket.emit("markasread-group", {
+                  messageids: unreadmessages.map((msg) => msg._id.toString()),
+                  readerid: user._id,
+                  groupid
+              })
+          }
+  
+      }, [messages,readrecipts,groupid,user._id,socket])
+
+
+      const renderreadstatus = (message) => {
+        if (message.sender._id.toString() !== user._id) return null;
+        const isread = readrecipts[message._id.toString()]?.length > 0;
+        
+           
+        return (
+            <div className='text-right mt-1'>
+                <span className={`text-xs ${isread ? "text-green-500 font-medium" : "text-gray-400"}`}>
+                    {isread ? "Seen" : "Sent"}
+                </span>
+            </div>
+        )
+    }
+
 
     useEffect(() => {
         clearTimeout(typingtimeout.current)
@@ -105,19 +145,23 @@ function Groupchat() {
         <div className='flex-1 overflow-y-auto p-4 space-y-4 ' style={{scrollbarWidth:"none"}} >
             {
                 messages.map((message) => (
-                    <div key={message._id} className={`flex ${message.sender._id === user._id ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-xs p-3 rounded-lg ${message.sender._id === user._id ? "bg-blue-500 text-white" : "bg-gray-200"}`}>
+
+
+                    
+                        <div key={message._id} className={`flex ${message.sender._id.toString() === user._id ? "justify-end" : "justify-start"}`}>
+                        <div className={`max-w-xs p-3 rounded-lg ${message.sender._id.toString() === user._id ? "bg-blue-500 text-white" : "bg-gray-200"}`}>
                            <p className={`text-sm font-medium`}>
-                                {message.sender._id === user._id ? "you" : message.sender.username}
+                                {message.sender._id.toString() === user._id ? "you" : message.sender.username}
                            </p>
                            <p>{message.message}</p>
-                          
+                            {renderreadstatus(message)}
                            <p className='text-xs opacity-70 mt-1'>
                             {new Date(message.timestamp).toLocaleTimeString()}
                            </p>
                         </div>
                     </div>
-                ))}
+                    
+                  ))}
                 <div ref={messageendref} />
         </div>
 
