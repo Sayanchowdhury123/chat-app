@@ -7,6 +7,7 @@ import axios from 'axios';
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import api from "../api";
+import { FaPaperclip, FaTimes, FaCheck, FaCheckDouble, FaFilePdf, FaRegFilePdf } from "react-icons/fa"
 
 
 
@@ -22,24 +23,27 @@ function Chat() {
     const typingtimeout = useRef(null);
     const [readrecipts, setreadrecipts] = useState({})
     const msgendref = useRef(null)
-
-
+    const [file, setfile] = useState(null)
+    const [filepreview, setfilepreview] = useState(null)
+    const fileinputref = useRef(null)
+    const max_size = 10 * 1024 * 1024;
     const room = [user._id, contactid].sort().join('_');
+    const [isuploading, setisuploading] = useState(false)
 
     useEffect(() => {
 
-        
-    const fetchmessages = async () => {
-        try {
-            const res = await api.get(`/messages/${contactid}`);
-            setmessages(res.data)
-            console.log(user._id);
 
-        } catch (error) {
-            console.log(error);
+        const fetchmessages = async () => {
+            try {
+                const res = await api.get(`/messages/${contactid}`);
+                setmessages(res.data)
+                console.log(user._id);
+
+            } catch (error) {
+                console.log(error);
+            }
+
         }
-
-    }
 
         fetchmessages();
 
@@ -64,7 +68,7 @@ function Chat() {
         })
 
 
-       
+
 
         return () => {
             socket.emit("leaveroom", room)
@@ -95,7 +99,7 @@ function Chat() {
             })
         }
 
-    }, [messages,readrecipts,room,user._id,socket])
+    }, [messages, readrecipts, room, user._id, socket])
 
 
 
@@ -103,33 +107,38 @@ function Chat() {
     const renderreadstatus = (message) => {
         if (message.sender !== user._id) return null;
         const isread = readrecipts[message._id]?.length > 0;
-        
+
         return (
-            <div className='text-right mt-1'>
-                <span className={`text-xs ${isread ? "text-green-500 font-medium" : "text-gray-400"}`}>
-                    {isread ? "Seen" : "Sent"}
+            <div className='flex items-center justify-end mt-1 space-x-1'>
+                <span className='text-xs text-gray-500'>
+                    {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
+                {isread ? (
+                    <FaCheckDouble className='text-xs text-blue-500' />
+                ) : (
+                    <FaCheck className='text-xs text-gray-400' />
+                )}
             </div>
         )
     }
 
 
 
-    const sendmessage = async (e) => {
-        if (newmessage.trim()) {
-            try {
-                const message = {
-                    sender: user._id,
-                    reciver: contactid,
-                    message: newmessage
-                }
+    const sendmessage = async () => {
+        if (!newmessage.trim() && !file) return;
 
-                socket.emit("sendmessage", { room, message })
-                setnewmessage("")
-                handletyping(false)
-            } catch (error) {
-                console.log(error);
+        if (file) {
+            uploadfile()
+        } else {
+            const message = {
+                sender: user._id,
+                reciver: contactid,
+                message: newmessage
             }
+
+            socket.emit("sendmessage", { room, message })
+            setnewmessage("")
+            handletyping(false)
         }
 
     }
@@ -159,29 +168,170 @@ function Chat() {
         clearTimeout(typingtimeout.current)
     }, [])
 
+
+
+
+    const handlefilechange = (e) => {
+        const selectedfile = e.target.files[0];
+        if (!selectedfile) return;
+
+        if (selectedfile.size > max_size) {
+            alert("file size exceeds 10Mb")
+            return;
+        }
+        setfile(selectedfile)
+
+
+        if (selectedfile.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = () => setfilepreview(reader.result)
+            reader.readAsDataURL(selectedfile)
+        } else if (selectedfile.type.startsWith('video/')) {
+            setfilepreview(URL.createObjectURL(selectedfile))
+        }
+
+    }
+
+    const clearfile = () => {
+        setfile(null)
+        setfilepreview(null)
+        if (fileinputref.current) fileinputref.current.value = '';
+
+    }
+
+    const uploadfile = async () => {
+        if (!file) return;
+
+        setisuploading(true)
+
+        try {
+            const formdata = new FormData();
+            formdata.append("file", file)
+            formdata.append("userid", user._id)
+            formdata.append("room", room)
+            formdata.append("contactid", contactid)
+
+         const res =   await api.post('/upload', formdata, {
+                headers: {
+                    "Content-Type": "multipart/form-data"
+                }
+            })
+
+            console.log(res.data);
+
+            clearfile()
+        } catch (error) {
+            console.log("upload failed", error);
+        } finally {
+            setisuploading(false)
+        }
+
+    }
+
+
+    const renderfilemessage = (message) => {
+        const file = message.filetype;
+        if (!file) return null;
+
+        if (file.startsWith('image/')) {
+            return (
+                <div className='max-w-xs md:max-w-md'>
+                    <img src={`uploads\${message.filepath}`} alt={message.filename} className='rounded-lg shadow-sm' />
+                    {renderreadstatus(message)}
+                </div>
+            )
+        }
+
+        if (file.startsWith('video/')) {
+            return (
+                <div className='max-w-xs md:max-w-md'>
+                    <video controls className='rounded-lg shadow-sm' >
+                        <source src={`/uploads/${message.filepath}`} type={message.filetype} />
+                    </video>
+                    {renderreadstatus(message)}
+                </div>
+            )
+        }
+
+        return (
+            <div className='max-w-xs p-3 bg-gray-100 rounded-lg shadow-sm'>
+                <a href={`/uploads/${message.filepath}`} download={message.filename} className='flex items-center space-x-2' >
+                    <div className='p-2 bg-white rounded'>
+                        {file.includes('pdf') ? (<FaFilePdf className='text-xs' />) : (<FaRegFilePdf className='text-xs' />)}
+                    </div>
+                    <div>
+                        <p className='font-medium truncate'>{message.filename}</p>
+                        <p className='text-xs text-gray-500'>
+                            {(message.filesize / 1024 / 1024).toFixed(2)}MB
+                        </p>
+                    </div>
+                </a>
+                {renderreadstatus(message)}
+            </div>
+        )
+    }
+
+
+    const rendertextmessage = (message) => {
+        return (
+        
+            <div className={`inline-block p-2 rounded-lg ${message.sender === user._id ? "bg-blue-500 text-white" : "bg-gray-200"}`}>
+                <p>{message.message}</p>
+                {renderreadstatus(message)}
+            </div>
+        
+        )
+    }
+
+
+
+
     return (
-        <div className='p-6 flex flex-col h-screen'>
-            <h1 className='text-2xl font-bold mb-6'>Chat </h1>
+        <div className=' flex flex-col h-screen p-6'>
+          
 
-            <div className='mb-4 flex-1 overflow-y-auto' ref={msgendref}>
+            <div className='flex-1 overflow-y-auto pb-4 space-y-3 ' ref={msgendref}>
                 {
-                    messages.map((message) => {
+                    messages.map((message) => (
+                        <div key={message._id} className={`flex ${message.sender === user._id ? "justify-end":"justify-start"}`}>
+                              
+                        {   message.file ? renderfilemessage(message) : rendertextmessage(message) }
+                        </div>
 
 
-
-                        return (
-                            <div key={message._id} className={`mb-2 ${message.sender === user._id ? "text-right" : "text-left"}`} >
-                                <div className={`inline-block p-2 rounded-lg ${message.sender === user._id ? "bg-blue-500 text-white" : "bg-gray-200"}`}>
-                                    <p>{message.message}</p>
-                                    
-                                    {renderreadstatus(message)}
-                                </div>
-                            </div>
-                        )
-
-                    })}
+                    ))}
                 <div ref={messageendref} />
             </div>
+
+            {
+                filepreview && (
+                    <div className='relative p-4 bg-gray-50 border-t'>
+                        <button onClick={clearfile} className='absolute top-2 right-2 p-1 text-gray-500 hover:text-red-500'>
+                            <FaTimes />
+                        </button>
+
+                        {file.type.startsWith('image/') ? (
+                            <img src={filepreview} alt="preview" className='h-32 rounded' />
+                        ) : file.type.startsWith('video/') ? (
+                            <video className='h-32 rounded'>
+                                <source src={filepreview} type={file.type} />
+                            </video>
+                        ) : (
+                            <div className='flex items-center p-2 bg-white rounded border'>
+                                <div className='text-2xl mr-2'>
+                                    {file.type.includes('pdf') ? (<FaFilePdf className='text-xs' />) : (<FaRegFilePdf className='text-xs' />)}
+                                </div>
+                                <div>
+                                    <p className='font-medium'>{file.name}</p>
+                                    <p className='text-xs text-gray-500'>{(file.size / 1024 / 1024).toFixed(2)}MB</p>
+                                </div>
+                            </div>
+
+                        )
+                        }
+                    </div>
+                )
+            }
 
 
 
@@ -208,8 +358,17 @@ function Chat() {
                 )
             }
 
-            <div className='sticky bottom-0 pt-4 pb-6 bg-white'>
-                <div className='flex '>
+
+            <div className='p-4 bg-white border-t'>
+
+                <div className='flex items-center space-x-2'>
+
+                    <input type="file" ref={fileinputref} onChange={handlefilechange} accept="image/*,video/*,.pdf,.doc,docx" className="hidden" id="file-upload" />
+                    <label htmlFor="file-upload" className='p-2 text-gray-500 rounded-full hover:bg-gray-100 cursor-pointer'>
+                        <FaPaperclip />
+                    </label>
+
+
                     <Input autoFocus value={newmessage} placeholder="Type a message..." className="mr-4" onChange={(e) => {
                         setnewmessage(e.target.value)
                         handletyping(e.target.value.length > 0)
@@ -221,7 +380,9 @@ function Chat() {
                         }}
 
                     />
-                    <Button onClick={sendmessage}>Send</Button>
+                    <Button onClick={sendmessage} disabled={(!newmessage && !file) || isuploading}>
+                        {isuploading ? "Sending..." : "Send"}
+                    </Button>
                 </div>
             </div>
 
