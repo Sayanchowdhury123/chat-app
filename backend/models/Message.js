@@ -7,10 +7,13 @@ const messageschema = new mongoose.Schema({
    message:{type:String},
    timestamp: {type:Date,default: Date.now},
    read:{type:Boolean, default:false},
-    filename: {type:String},
-    filepath:{type:String},
-    filetype:{type: String},
-    filesize:{type:Number}
+    file:{
+        name: {type:String},
+        type: {type:String},
+        path: {type:String},
+        size: {type:Number},
+
+    }
 })
 
 

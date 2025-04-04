@@ -27,8 +27,8 @@ function Chat() {
     const [filepreview, setfilepreview] = useState(null)
     const fileinputref = useRef(null)
     const max_size = 10 * 1024 * 1024;
-    const room = [user._id, contactid].sort().join('_');
-    const [isuploading, setisuploading] = useState(false)
+    const room = [user._id,contactid].sort().join('_')
+    
 
     useEffect(() => {
 
@@ -48,14 +48,23 @@ function Chat() {
         fetchmessages();
 
         //read recipt
-        socket.on("readupdate", ({ messageid, readby }) => {
-            setreadrecipts(prev => ({ ...prev, [messageid]: readby }))
-        })
+        //   socket.on("readupdate", ({ messageid, readby }) => {
+          //  setreadrecipts(prev => ({ ...prev, [messageid]: readby }))
+     //   })
+
+     const handlemessageread = ({messageids}) => {
+        setmessages(prev => prev.map(msg => messageids.includes(msg.id) ? {...msg, read: true} : msg))
+     }
+
+     socket.on("messageread", handlemessageread)
 
 
 
 
-        socket.emit("joinroom", room);
+        socket.emit("joinroom", {
+            userid: user._id,
+            otheruserid: contactid
+        });
 
         socket.on("singleusertyping", ({ userids }) => {
             settypingusers(userids)
@@ -67,16 +76,20 @@ function Chat() {
             setmessages((prev) => [...prev, message])
         })
 
+        console.log(messages);
+
 
 
 
         return () => {
-            socket.emit("leaveroom", room)
+            socket.emit("leaveroom", {  userid: user._id,
+                otheruserid: contactid})
             socket.off("recivemessage")
             socket.off("singleusertyping")
-            socket.off("readupdate")
+            socket.off("messageread")
+           // socket.off("readupdate")
         }
-    }, [contactid])
+    }, [contactid,socket,user._id])
 
     useEffect(() => {
 
@@ -90,30 +103,28 @@ function Chat() {
     useEffect(() => {
 
 
-        const unreadmessages = messages.filter(msg => msg.sender !== user._id && !readrecipts[msg._id]?.includes(user._id))
+        const unreadmessages = messages.filter(msg => msg.sender !== user._id && !msg.read)
         if (unreadmessages.length > 0) {
-            socket.emit("markasread", {
+            socket.emit("markmessageread", {
                 messageids: unreadmessages.map((msg) => msg._id),
-                readerid: user._id,
-                room
+                readerid: user._id
+                
             })
         }
 
-    }, [messages, readrecipts, room, user._id, socket])
+    }, [messages, readrecipts, user._id, socket])
 
 
 
 
     const renderreadstatus = (message) => {
         if (message.sender !== user._id) return null;
-        const isread = readrecipts[message._id]?.length > 0;
+      //  const isread = readrecipts[message._id]?.length > 0;
 
         return (
             <div className='flex items-center justify-end mt-1 space-x-1'>
-                <span className='text-xs text-gray-500'>
-                    {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-                {isread ? (
+                
+                {message.read ? (
                     <FaCheckDouble className='text-xs text-blue-500' />
                 ) : (
                     <FaCheck className='text-xs text-gray-400' />
@@ -129,6 +140,8 @@ function Chat() {
 
         if (file) {
             uploadfile()
+            setfilepreview(null)
+            
         } else {
             const message = {
                 sender: user._id,
@@ -202,7 +215,7 @@ function Chat() {
     const uploadfile = async () => {
         if (!file) return;
 
-        setisuploading(true)
+        
 
         try {
             const formdata = new FormData();
@@ -217,56 +230,61 @@ function Chat() {
                 }
             })
 
-            console.log(res.data);
+            
 
             clearfile()
         } catch (error) {
             console.log("upload failed", error);
-        } finally {
-            setisuploading(false)
-        }
+        } 
 
     }
 
 
     const renderfilemessage = (message) => {
-        const file = message.filetype;
+        const file = message.file;
+        console.log(message);
         if (!file) return null;
 
-        if (file.startsWith('image/')) {
+        if (file.type?.startsWith('image/')) {
             return (
                 <div className='max-w-xs md:max-w-md'>
-                    <img src={`uploads\${message.filepath}`} alt={message.filename} className='rounded-lg shadow-sm' />
-                    {renderreadstatus(message)}
+                    <img src={`http://localhost:5000/${file.path}`} alt={file.name} className='rounded-lg shadow-sm' />
+                    <span className='text-xs text-black ml-1'>
+                    {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
                 </div>
             )
         }
 
-        if (file.startsWith('video/')) {
+        if (file.type?.startsWith('video/')) {
             return (
                 <div className='max-w-xs md:max-w-md'>
                     <video controls className='rounded-lg shadow-sm' >
-                        <source src={`/uploads/${message.filepath}`} type={message.filetype} />
+                        <source src={`http://localhost:5000/${file.path}`} type={file.type} />
                     </video>
-                    {renderreadstatus(message)}
+                    <span className='text-xs text-black'>
+                    {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
                 </div>
             )
         }
 
         return (
             <div className='max-w-xs p-3 bg-gray-100 rounded-lg shadow-sm'>
-                <a href={`/uploads/${message.filepath}`} download={message.filename} className='flex items-center space-x-2' >
+                <a href={`http://localhost:5000/${file.path}`} download={message.filename} className='flex items-center space-x-2' >
                     <div className='p-2 bg-white rounded'>
-                        {file.includes('pdf') ? (<FaFilePdf className='text-xs' />) : (<FaRegFilePdf className='text-xs' />)}
+                        {file.type?.includes('pdf') ? (<FaFilePdf className='text-xs' />) : (<FaRegFilePdf className='text-xs' />)}
                     </div>
                     <div>
                         <p className='font-medium truncate'>{message.filename}</p>
                         <p className='text-xs text-gray-500'>
-                            {(message.filesize / 1024 / 1024).toFixed(2)}MB
+                            {(file?.size / 1024 / 1024).toFixed(2)}MB
                         </p>
                     </div>
                 </a>
-                {renderreadstatus(message)}
+                <span className='text-xs text-black'>
+                    {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
             </div>
         )
     }
@@ -277,7 +295,10 @@ function Chat() {
         
             <div className={`inline-block p-2 rounded-lg ${message.sender === user._id ? "bg-blue-500 text-white" : "bg-gray-200"}`}>
                 <p>{message.message}</p>
-                {renderreadstatus(message)}
+                <span className='text-xs text-black'>
+                    {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+                
             </div>
         
         )
@@ -296,6 +317,7 @@ function Chat() {
                         <div key={message._id} className={`flex ${message.sender === user._id ? "justify-end":"justify-start"}`}>
                               
                         {   message.file ? renderfilemessage(message) : rendertextmessage(message) }
+
                         </div>
 
 
@@ -310,16 +332,16 @@ function Chat() {
                             <FaTimes />
                         </button>
 
-                        {file.type.startsWith('image/') ? (
+                        {file.type?.startsWith('image/') ? (
                             <img src={filepreview} alt="preview" className='h-32 rounded' />
-                        ) : file.type.startsWith('video/') ? (
+                        ) : file.type?.startsWith('video/') ? (
                             <video className='h-32 rounded'>
                                 <source src={filepreview} type={file.type} />
                             </video>
                         ) : (
                             <div className='flex items-center p-2 bg-white rounded border'>
                                 <div className='text-2xl mr-2'>
-                                    {file.type.includes('pdf') ? (<FaFilePdf className='text-xs' />) : (<FaRegFilePdf className='text-xs' />)}
+                                    {file.type?.includes('pdf') ? (<FaFilePdf className='text-xs' />) : (<FaRegFilePdf className='text-xs' />)}
                                 </div>
                                 <div>
                                     <p className='font-medium'>{file.name}</p>
@@ -380,8 +402,8 @@ function Chat() {
                         }}
 
                     />
-                    <Button onClick={sendmessage} disabled={(!newmessage && !file) || isuploading}>
-                        {isuploading ? "Sending..." : "Send"}
+                    <Button onClick={sendmessage} disabled={(!newmessage && !file) }>
+                        Send
                     </Button>
                 </div>
             </div>

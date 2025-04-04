@@ -4,7 +4,7 @@ const dotenv = require("dotenv");
 const mongoose = require("mongoose");
 const http = require("http");
 const connectdb = require("./config/db");
-const Message = require("./models/Message");
+const Message = require("./models/Message")
 const Groupmessages = require("./models/Groupmessages");
 const { JsonWebTokenError } = require("jsonwebtoken");
 const jwt = require("jsonwebtoken");
@@ -12,16 +12,16 @@ const User = require("./models/User");
 const Group = require("./models/Groupchats");
 const path = require("path");
 const multer = require("multer");
-const socketio = require("socket.io")
+const {Server} = require("socket.io")
 const auth = require("./middleware/authmiddleware")
-
+const upload = require("./middleware/uploadimage")
 
 
 dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
-const io = socketio(server, {
+const io = new Server(server, {
     cors:{
         origin:"*",
         methods:["GET","POST"]
@@ -43,30 +43,7 @@ app.use("/uploads", express.static(path.join(__dirname,"uploads")));
 
 connectdb();
 
-const storage = multer.diskStorage({
-    destination: "uploads/",
-    filename: (req,file,cb) => {
-        cb(null, `${Date.now()}-${file.originalname}`)
-    }
-})
 
-const fileFilter = (req,file,cb) => {
-    const allowedtypes = [
-        "image/jpeg",
-        "image/png",
-        "image/gif",
-        "image/wbbp",
-
-    ];
-
-    cb(null, allowedtypes.includes(file.mimetype))
-}
-
-const upload = multer({
-    storage,
-    fileFilter,
-    limits:{fileSize: 10 * 1024 * 1024}
-})
 
 
 
@@ -83,21 +60,22 @@ app.post("/api/upload", upload.single("file"),async (req,res) => {
             return res.status(400).json({msg:"invalid file type"})
         }
 
+        console.log(req.file);
+
         const message = new Message({
             sender: req.body.userid,
             reciver: req.body.contactid,
-            
-                filename: req.file.originalname,
-                filepath: req.file.filename,
-                filetype: req.file.mimetype,
-                filesize: req.file.size
-        
-           
+              file:{
+                name: req.file.originalname,
+                path: req.file.path,
+                type: req.file.mimetype,
+                size: req.file.size
+            } 
 
         })
 
         const savedmessage = await message.save();
-         res.json(savedmessage)
+         
         io.to(req.body.room).emit("recivemessage", savedmessage)
         
     } catch (error) {
@@ -131,23 +109,39 @@ io.on("connection", (socket) => {
     console.log("user connected");
 
 //read recipt
-socket.on("markasread",  ({messageids,readerid,room}) => {
-  console.log(messageids)
-    messageids.forEach((messageid) => {
-        if(!readrecipts.has(messageid)){
-            readrecipts.set(messageid, new Set())
-        }
-        readrecipts.get(messageid).add(readerid)
-    
-        io.to(room).emit("readupdate", {
-           messageid,
-           readby: Array.from( readrecipts.get(messageid))
-        })
+socket.on("markmessageasread", async   ({messageids,readerid}) => {
+  
+await Message.updateMany(
+    {_id: {$in: messageids}},
+    {$set: {read: true}}
+)
 
-        
+const messages = await Message.find({_id: {$in: messageids}})
+const senderid = messages[0]?.sender;
+
+if(senderid){
+    io.to(senderid.toString()).emit("messageread",{
+        messageids,
+        readerid
     })
+}
 
-   
+
+
+
+ //   messageids.forEach( (messageid) => {
+
+   //     if(!readrecipts.has(messageid)){
+     //       readrecipts.set(messageid, new Set())
+       // }
+      //  readrecipts.get(messageid).add(readerid)
+    
+      //  io.to(room).emit("readupdate", {
+          // messageid,
+        //   readby: Array.from( readrecipts.get(messageid))
+    //    })
+    
+  // })
 })
 
 //read recipt group
@@ -235,9 +229,10 @@ socket.on("markasread-group",  ({messageids,readerid,groupid}) => {
     })
    
 
-    socket.on("joinroom", (room) => {
-        socket.join(room)
-        console.log(`user ${socket.id} joined room ${room}`);
+    socket.on("joinroom", ({userid,otheruserid}) => {
+        socket.join(userid)
+        socket.join(`${[userid,otheruserid].sort().join('_')}`)
+        console.log(`user ${socket.id} joined room ${[userid,otheruserid].sort().join('_')}`);
     })
 
     socket.on("joingroup", (groupid) => {
@@ -259,8 +254,8 @@ socket.on("markasread-group",  ({messageids,readerid,groupid}) => {
             await newmessage.save();
             
 
-           
-        io.to(room).emit("recivemessage", newmessage);
+           const roomname = `${[message.sender,message.reciver].sort().join('_')}`
+        io.to(roomname).emit("recivemessage", newmessage);
         } catch (error) {
             console.log(error);
         }
@@ -299,9 +294,10 @@ socket.on("markasread-group",  ({messageids,readerid,groupid}) => {
         }
     })
 
-    socket.on("leaveroom", (room) => {
-        socket.leave(room)
-        console.log(`user ${socket.id} left room ${room}`);
+    socket.on("leaveroom", ({userid,otheruserid}) => {
+        socket.leave(userid)
+        socket.leave(`${[userid,otheruserid].sort().join('_')}`)
+        console.log(`user ${socket.id} left room ${[userid,otheruserid].sort().join('_')}`);
     })
 
    
