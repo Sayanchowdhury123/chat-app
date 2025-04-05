@@ -27,8 +27,8 @@ function Chat() {
     const [filepreview, setfilepreview] = useState(null)
     const fileinputref = useRef(null)
     const max_size = 10 * 1024 * 1024;
-    const room = [user._id,contactid].sort().join('_')
-    
+    const room = [user._id, contactid].sort().join('_')
+
 
     useEffect(() => {
 
@@ -49,14 +49,14 @@ function Chat() {
 
         //read recipt
         //   socket.on("readupdate", ({ messageid, readby }) => {
-          //  setreadrecipts(prev => ({ ...prev, [messageid]: readby }))
-     //   })
+        //  setreadrecipts(prev => ({ ...prev, [messageid]: readby }))
+        //   })
 
-     const handlemessageread = ({messageids}) => {
-        setmessages(prev => prev.map(msg => messageids.includes(msg.id) ? {...msg, read: true} : msg))
-     }
+        const handlemessageread = ({ messageids }) => {
+            setmessages(prev => prev.map(msg => messageids.includes(msg.id) ? { ...msg, read: true } : msg))
+        }
 
-     socket.on("messageread", handlemessageread)
+        socket.on("messageread", handlemessageread)
 
 
 
@@ -82,14 +82,16 @@ function Chat() {
 
 
         return () => {
-            socket.emit("leaveroom", {  userid: user._id,
-                otheruserid: contactid})
+            socket.emit("leaveroom", {
+                userid: user._id,
+                otheruserid: contactid
+            })
             socket.off("recivemessage")
             socket.off("singleusertyping")
             socket.off("messageread")
-           // socket.off("readupdate")
+            // socket.off("readupdate")
         }
-    }, [contactid,socket,user._id])
+    }, [contactid, socket, user._id])
 
     useEffect(() => {
 
@@ -108,7 +110,7 @@ function Chat() {
             socket.emit("markmessageread", {
                 messageids: unreadmessages.map((msg) => msg._id),
                 readerid: user._id
-                
+
             })
         }
 
@@ -119,11 +121,11 @@ function Chat() {
 
     const renderreadstatus = (message) => {
         if (message.sender !== user._id) return null;
-      //  const isread = readrecipts[message._id]?.length > 0;
+        //  const isread = readrecipts[message._id]?.length > 0;
 
         return (
             <div className='flex items-center justify-end mt-1 space-x-1'>
-                
+
                 {message.read ? (
                     <FaCheckDouble className='text-xs text-blue-500' />
                 ) : (
@@ -141,7 +143,7 @@ function Chat() {
         if (file) {
             uploadfile()
             setfilepreview(null)
-            
+
         } else {
             const message = {
                 sender: user._id,
@@ -215,7 +217,7 @@ function Chat() {
     const uploadfile = async () => {
         if (!file) return;
 
-        
+
 
         try {
             const formdata = new FormData();
@@ -224,18 +226,18 @@ function Chat() {
             formdata.append("room", room)
             formdata.append("contactid", contactid)
 
-         const res =   await api.post('/upload', formdata, {
+            const res = await api.post('/upload', formdata, {
                 headers: {
                     "Content-Type": "multipart/form-data"
                 }
             })
 
-            
+
 
             clearfile()
         } catch (error) {
             console.log("upload failed", error);
-        } 
+        }
 
     }
 
@@ -249,9 +251,11 @@ function Chat() {
             return (
                 <div className='max-w-xs md:max-w-md'>
                     <img src={`http://localhost:5000/${file.path}`} alt={file.name} className='rounded-lg shadow-sm' />
-                    <span className='text-xs text-black ml-1'>
-                    {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
+                    <div className='flex items-center justify-end mt-1 space-x-1'>
+                        <span className='text-xs text-black '>
+                            {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                    </div>
                 </div>
             )
         }
@@ -262,9 +266,11 @@ function Chat() {
                     <video controls className='rounded-lg shadow-sm' >
                         <source src={`http://localhost:5000/${file.path}`} type={file.type} />
                     </video>
-                    <span className='text-xs text-black'>
-                    {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
+                    <div className='flex items-center justify-end mt-1 space-x-1'>
+                        <span className='text-xs text-black '>
+                            {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                    </div>
                 </div>
             )
         }
@@ -282,9 +288,11 @@ function Chat() {
                         </p>
                     </div>
                 </a>
-                <span className='text-xs text-black'>
-                    {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
+                <div className='flex items-center justify-end mt-1 space-x-1'>
+                        <span className='text-xs text-black '>
+                            {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                    </div>
             </div>
         )
     }
@@ -292,15 +300,17 @@ function Chat() {
 
     const rendertextmessage = (message) => {
         return (
-        
+
             <div className={`inline-block p-2 rounded-lg ${message.sender === user._id ? "bg-blue-500 text-white" : "bg-gray-200"}`}>
                 <p>{message.message}</p>
-                <span className='text-xs text-black'>
-                    {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-                
+                <div className='flex items-center justify-end mt-1 space-x-1'>
+                        <span className='text-xs text-black '>
+                            {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                    </div>
+
             </div>
-        
+
         )
     }
 
@@ -309,14 +319,14 @@ function Chat() {
 
     return (
         <div className=' flex flex-col h-screen p-6'>
-          
 
-            <div className='flex-1 overflow-y-auto pb-4 space-y-3 ' ref={msgendref}>
+
+            <div className='flex-1 overflow-y-auto pb-4 space-y-3 ' ref={msgendref}  style={{scrollbarWidth:"none"}}>
                 {
                     messages.map((message) => (
-                        <div key={message._id} className={`flex ${message.sender === user._id ? "justify-end":"justify-start"}`}>
-                              
-                        {   message.file ? renderfilemessage(message) : rendertextmessage(message) }
+                        <div key={message._id} className={`flex ${message.sender === user._id ? "justify-end" : "justify-start"}`}>
+
+                            {message.file ? renderfilemessage(message) : rendertextmessage(message)}
 
                         </div>
 
@@ -402,7 +412,7 @@ function Chat() {
                         }}
 
                     />
-                    <Button onClick={sendmessage} disabled={(!newmessage && !file) }>
+                    <Button onClick={sendmessage} disabled={(!newmessage && !file)}>
                         Send
                     </Button>
                 </div>

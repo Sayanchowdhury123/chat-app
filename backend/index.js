@@ -60,7 +60,7 @@ app.post("/api/upload", upload.single("file"),async (req,res) => {
             return res.status(400).json({msg:"invalid file type"})
         }
 
-        console.log(req.file);
+       
 
         const message = new Message({
             sender: req.body.userid,
@@ -74,15 +74,50 @@ app.post("/api/upload", upload.single("file"),async (req,res) => {
 
         })
 
+
         const savedmessage = await message.save();
          
         io.to(req.body.room).emit("recivemessage", savedmessage)
+        
         
     } catch (error) {
         console.log(error);
         res.status(400).json({error: error})
     }
 } )
+
+
+app.post("/api/upload/group", upload.single("file"),async (req,res) => {
+    try {
+        if(!req.file){
+            return res.status(400).json({msg:"invalid file type"})
+        }
+
+    
+        const newmessage = new Groupmessages({
+        
+            group: req.body.groupid,
+            sender: socket.userid,
+            file:{
+                name: req.file.originalname,
+                path: req.file.path,
+                type: req.file.mimetype,
+                size: req.file.size
+            } 
+        })
+
+        await newmessage.save()
+
+        io.to(`group_${req.body.groupid}`).emit("recivegroupmessage", newmessage)
+        
+    } catch (error) {
+        console.log(error);
+        res.status(400).json({error: error})
+    }
+} )
+
+
+
 
 
 io.use(async (socket,next) => {

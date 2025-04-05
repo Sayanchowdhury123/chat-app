@@ -1,10 +1,17 @@
 const mongoose = require("mongoose");
 
 const groupmessageschema = new mongoose.Schema({
-    message:{type:String,required:true},
+    message:{type:String},
     group: {type:mongoose.Schema.Types.ObjectId, ref:"Group",required:true},
     sender: {type:mongoose.Schema.Types.ObjectId, ref:"User"},
-    timestamp: {type: Date, default: Date.now}
+    timestamp: {type: Date, default: Date.now},
+    file:{
+        name: {type:String},
+        type: {type:String},
+        path: {type:String},
+        size: {type:Number},
+
+    }
 })
 
 
