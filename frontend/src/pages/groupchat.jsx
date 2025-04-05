@@ -187,7 +187,7 @@ function Groupchat() {
         try {
             const formdata = new FormData();
             formdata.append("file", file)
-          //  formdata.append("userid", user._id)
+           formdata.append("userid", user._id)
             formdata.append("groupid", groupid)
            // formdata.append("contactid", contactid)
 
@@ -216,6 +216,9 @@ function Groupchat() {
         if (file.type?.startsWith('image/')) {
             return (
                 <div className='max-w-xs md:max-w-md'>
+                    <p className={`text-sm font-medium`}>
+                    {message.sender._id.toString() === user._id ? "you" : message.sender.username}
+                </p>
                     <img src={`http://localhost:5000/${file.path}`} alt={file.name} className='rounded-lg shadow-sm' />
                     <div className='flex items-center justify-end mt-1 space-x-1'>
                         <span className='text-xs text-black '>
@@ -229,6 +232,9 @@ function Groupchat() {
         if (file.type?.startsWith('video/')) {
             return (
                 <div className='max-w-xs md:max-w-md'>
+                    <p className={`text-sm font-medium`}>
+                    {message.sender._id.toString() === user._id ? "you" : message.sender.username}
+                </p>
                     <video controls className='rounded-lg shadow-sm' >
                         <source src={`http://localhost:5000/${file.path}`} type={file.type} />
                     </video>
@@ -243,6 +249,9 @@ function Groupchat() {
 
         return (
             <div className='max-w-xs p-3 bg-gray-100 rounded-lg shadow-sm'>
+                <p className={`text-sm font-medium`}>
+                    {message.sender._id.toString() === user._id ? "you" : message.sender.username}
+                </p>
                 <a href={`http://localhost:5000/${file.path}`} download={message.filename} className='flex items-center space-x-2' >
                     <div className='p-2 bg-white rounded'>
                         {file.type?.includes('pdf') ? (<FaFilePdf className='text-xs' />) : (<FaRegFilePdf className='text-xs' />)}
@@ -266,7 +275,7 @@ function Groupchat() {
     const rendertextmessage = (message) => {
         return (
 
-            <div className={`inline-block p-2 rounded-lg ${message.sender._id.toString() === user._id ? "bg-blue-500 text-white" : "bg-gray-200"}`}>
+            <div className={`inline-block p-2 rounded-lg ${message.sender._id?.toString() === user._id ? "bg-blue-500 text-white" : "bg-gray-200"}`}>
                 <p className={`text-sm font-medium`}>
                     {message.sender._id.toString() === user._id ? "you" : message.sender.username}
                 </p>

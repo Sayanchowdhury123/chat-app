@@ -97,7 +97,7 @@ app.post("/api/upload/group", upload.single("file"),async (req,res) => {
         const newmessage = new Groupmessages({
         
             group: req.body.groupid,
-            sender: socket.userid,
+            sender: req.body.userid,
             file:{
                 name: req.file.originalname,
                 path: req.file.path,
@@ -107,8 +107,9 @@ app.post("/api/upload/group", upload.single("file"),async (req,res) => {
         })
 
         await newmessage.save()
+        const populatedmsg = await Groupmessages.populate(newmessage,{ path:"sender", select: "username"})
 
-        io.to(`group_${req.body.groupid}`).emit("recivegroupmessage", newmessage)
+        io.to(`group_${req.body.groupid}`).emit("recivegroupmessage", populatedmsg)
         
     } catch (error) {
         console.log(error);
