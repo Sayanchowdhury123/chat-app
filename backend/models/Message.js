@@ -13,7 +13,16 @@ const messageschema = new mongoose.Schema({
         path: {type:String},
         size: {type:Number},
 
-    }
+    },
+    reactions: [
+        {
+            emoji: String,
+            userids: [{
+                type: mongoose.Schema.Types.ObjectId,
+                ref:"User"
+            }]
+        }
+    ]
 })
 
 

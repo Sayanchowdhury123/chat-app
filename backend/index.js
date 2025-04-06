@@ -144,6 +144,31 @@ const readreciptsgroup = new Map();
 io.on("connection", (socket) => {
     console.log("user connected");
 
+
+    //emoji rection
+socket.on("addreaction", async ({messageid,emoji,userid}) => {
+    try {
+        const message = await Message.findById(messageid)
+
+        const reactionindex = message.reactions.findIndex(r => r.emoji === emoji);
+        if(reactionindex >= 0){
+            if(!message.reactions[reactionindex].userids.includes(userid)){
+                message.reactions[reactionindex].userids.push(userid)
+            }
+        }else{
+            message.reactions.push({emoji, userids: [userid]})
+        }
+    
+        const updatedmessage = await message.save()
+        const roomname = `${[message.sender,message.reciver].sort().join('_')}`;
+        io.to(roomname).emit("messageupdated", updatedmessage)
+    } catch (error) {
+        console.log(error);
+    }
+  
+} )
+
+
 //read recipt
 socket.on("markmessageasread", async   ({messageids,readerid}) => {
   

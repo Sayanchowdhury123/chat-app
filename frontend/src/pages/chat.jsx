@@ -4,11 +4,12 @@ import { Input } from '@/components/ui/input';
 import { Authcontext, useAuth } from '@/context/authcontext';
 import { useSocket } from '@/context/socketcontext';
 import axios from 'axios';
-import React, { useContext, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import api from "../api";
 import { FaPaperclip, FaTimes, FaCheck, FaCheckDouble, FaFilePdf, FaRegFilePdf } from "react-icons/fa"
-
+import EmojiPicker from 'emoji-picker-react';
+import { FaSmile } from 'react-icons/fa';
 
 
 function Chat() {
@@ -28,58 +29,62 @@ function Chat() {
     const fileinputref = useRef(null)
     const max_size = 10 * 1024 * 1024;
     const room = [user._id, contactid].sort().join('_')
+    const [showemojipicker, setshowemojipicker] = useState(false)
+    const [loading, setloading] = useState(true)
+    const [selectedmsg, setselectedmsg] = useState(null)
+    const emojiPickerref = useRef()
+
 
 
     useEffect(() => {
 
 
-        const fetchmessages = async () => {
-            try {
-                const res = await api.get(`/messages/${contactid}`);
-                setmessages(res.data)
-                console.log(user._id);
-
-            } catch (error) {
-                console.log(error);
-            }
-
-        }
-
         fetchmessages();
+    }, [contactid])
 
-        //read recipt
-        //   socket.on("readupdate", ({ messageid, readby }) => {
-        //  setreadrecipts(prev => ({ ...prev, [messageid]: readby }))
-        //   })
 
-        const handlemessageread = ({ messageids }) => {
-            setmessages(prev => prev.map(msg => messageids.includes(msg.id) ? { ...msg, read: true } : msg))
+    const fetchmessages = async () => {
+        try {
+            const res = await api.get(`/messages/${contactid}`);
+            setmessages(res.data)
+
+
+        } catch (error) {
+            console.log(error);
+        } finally {
+            setloading(false)
         }
 
-        socket.on("messageread", handlemessageread)
+    }
 
 
 
+    const handlenewmessage = (message) => {
+        
+        setmessages((prev) => [...prev, message])
+    }
+
+    const singletyping = ({ userids }) => {
+        settypingusers(userids)
+    }
+
+
+    useEffect(() => {
 
         socket.emit("joinroom", {
             userid: user._id,
             otheruserid: contactid
         });
 
-        socket.on("singleusertyping", ({ userids }) => {
-            settypingusers(userids)
+        socket.on("messageupdated", (updatedmessage) => {
+            
+            setmessages(prev => prev.map(msg => msg._id === updatedmessage._id ? { ...msg, reactions: updatedmessage.reactions || [] } : msg))
+
+
         })
 
-
-
-        socket.on("recivemessage", (message) => {
-            setmessages((prev) => [...prev, message])
-        })
-
-        console.log(messages);
-
-
-
+        socket.on("singleusertyping", singletyping)
+        socket.on("recivemessage", handlenewmessage)
 
         return () => {
             socket.emit("leaveroom", {
@@ -88,8 +93,7 @@ function Chat() {
             })
             socket.off("recivemessage")
             socket.off("singleusertyping")
-            socket.off("messageread")
-            // socket.off("readupdate")
+            socket.off("messageupdated")
         }
     }, [contactid, socket, user._id])
 
@@ -97,43 +101,7 @@ function Chat() {
 
         messageendref.current?.scrollIntoView({ behavior: "smooth" })
 
-    }, [messages, typingusers])
-
-
-
-
-    useEffect(() => {
-
-
-        const unreadmessages = messages.filter(msg => msg.sender !== user._id && !msg.read)
-        if (unreadmessages.length > 0) {
-            socket.emit("markmessageread", {
-                messageids: unreadmessages.map((msg) => msg._id),
-                readerid: user._id
-
-            })
-        }
-
-    }, [messages, readrecipts, user._id, socket])
-
-
-
-
-    const renderreadstatus = (message) => {
-        if (message.sender !== user._id) return null;
-        //  const isread = readrecipts[message._id]?.length > 0;
-
-        return (
-            <div className='flex items-center justify-end mt-1 space-x-1'>
-
-                {message.read ? (
-                    <FaCheckDouble className='text-xs text-blue-500' />
-                ) : (
-                    <FaCheck className='text-xs text-gray-400' />
-                )}
-            </div>
-        )
-    }
+    }, [messages.length, typingusers])
 
 
 
@@ -217,8 +185,6 @@ function Chat() {
     const uploadfile = async () => {
         if (!file) return;
 
-
-
         try {
             const formdata = new FormData();
             formdata.append("file", file)
@@ -244,7 +210,7 @@ function Chat() {
 
     const renderfilemessage = (message) => {
         const file = message.file;
-        console.log(message);
+
         if (!file) return null;
 
         if (file.type?.startsWith('image/')) {
@@ -256,6 +222,19 @@ function Chat() {
                             {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                     </div>
+
+                    {message.reactions?.length > 0 && (
+                        <div className='flex flex-wrap gap-1 mt-1 justify-end'>
+                            {message.reactions?.map((reaction, index) => (
+                                <div key={index} className='flex items-center px-2 py-0.5 bg-white bg-opacity-20 rounded-full'>
+                                    <span className='text-xs'>{reaction.emoji}</span>
+                                    {reaction.userids?.length > 1 && (
+                                        <span className='ml-1 text-xs '>{reaction.userids.length}</span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )
         }
@@ -271,6 +250,19 @@ function Chat() {
                             {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                     </div>
+
+                    {message.reactions?.length > 0 && (
+                        <div className='flex flex-wrap gap-1 mt-1 justify-end'>
+                            {message.reactions?.map((reaction, index) => (
+                                <div key={index} className='flex items-center px-2 py-0.5 bg-white bg-opacity-20 rounded-full'>
+                                    <span className='text-xs'>{reaction.emoji}</span>
+                                    {reaction.userids?.length > 1 && (
+                                        <span className='ml-1 text-xs '>{reaction.userids.length}</span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )
         }
@@ -289,48 +281,98 @@ function Chat() {
                     </div>
                 </a>
                 <div className='flex items-center justify-end mt-1 space-x-1'>
-                        <span className='text-xs text-black '>
-                            {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                    <span className='text-xs text-black '>
+                        {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                </div>
+
+                {message.reactions?.length > 0 && (
+                    <div className='flex flex-wrap gap-1 mt-1 justify-end'>
+                        {message.reactions?.map((reaction, index) => (
+                            <div key={index} className='flex items-center px-2 py-0.5 bg-white bg-opacity-20 rounded-full'>
+                                <span className='text-xs'>{reaction.emoji}</span>
+                                {reaction.userids?.length > 1 && (
+                                    <span className='ml-1 text-xs '>{reaction.userids.length}</span>
+                                )}
+                            </div>
+                        ))}
                     </div>
+                )}
             </div>
         )
     }
 
+
+
+
+    const handledoubleclick = (messageid) => {
+        setselectedmsg(messageid)
+        setshowemojipicker(true)
+    }
+
+    const hamdleemojiclick = (emojidata) => {
+        if (selectedmsg) {
+
+            socket.emit("addreaction", {
+                messageid: selectedmsg,
+                emoji: emojidata.emoji,
+                userid: user._id
+            })
+
+        }
+        setshowemojipicker(false)
+        //fetchmessages()
+
+    }
 
     const rendertextmessage = (message) => {
         return (
-
-            <div className={`inline-block p-2 rounded-lg ${message.sender === user._id ? "bg-blue-500 text-white" : "bg-gray-200"}`}>
+            <div className={`inline-block p-2 rounded-lg ${message?.sender === user._id ? "bg-blue-500 text-white" : "bg-gray-200"}`}   >
                 <p>{message.message}</p>
                 <div className='flex items-center justify-end mt-1 space-x-1'>
-                        <span className='text-xs text-black '>
-                            {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                    </div>
+                    <span className='text-xs text-black '>
+                        {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                </div>
 
+                {message.reactions?.length > 0 && (
+                    <div className='flex flex-wrap gap-1 mt-1 justify-end'>
+                        {message.reactions?.map((reaction, index) => (
+                            <div key={index} className='flex items-center px-2 py-0.5 bg-white bg-opacity-20 rounded-full'>
+                                <span className='text-xs'>{reaction.emoji}</span>
+                                {reaction.userids?.length > 1 && (
+                                    <span className='ml-1 text-xs '>{reaction.userids.length}</span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
         )
     }
-
-
-
-
+    if (loading) return <div className='p-4'>Loading message...</div>
     return (
         <div className=' flex flex-col h-screen p-6'>
 
 
-            <div className='flex-1 overflow-y-auto pb-4 space-y-3 ' ref={msgendref}  style={{scrollbarWidth:"none"}}>
+            <div className='flex-1 overflow-y-auto pb-4 space-y-3 ' ref={emojiPickerref} style={{ scrollbarWidth: "none" }}  >
                 {
                     messages.map((message) => (
-                        <div key={message._id} className={`flex ${message.sender === user._id ? "justify-end" : "justify-start"}`}>
+                        <div key={message._id} className={`flex ${message.sender === user._id ? "justify-end" : "justify-start"}`}
+                            onDoubleClick={() => handledoubleclick(message._id)}    >
 
                             {message.file ? renderfilemessage(message) : rendertextmessage(message)}
 
+                            {
+                                showemojipicker && selectedmsg === message._id && (
+                                    <div className='absolute bottom-[11%] mb-4  right-162 z-10 shadow-lg'>
+                                        <EmojiPicker onEmojiClick={hamdleemojiclick} width={300} height={350} previewConfig={{ showPreview: false }} />
+                                    </div>
+                                )
+                            }
+
                         </div>
-
-
                     ))}
                 <div ref={messageendref} />
             </div>
@@ -417,6 +459,8 @@ function Chat() {
                     </Button>
                 </div>
             </div>
+
+
 
 
         </div>
