@@ -6,6 +6,7 @@ import api from "../api";
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { FaPaperclip, FaTimes, FaCheck, FaCheckDouble, FaFilePdf, FaRegFilePdf } from "react-icons/fa"
+import EmojiPicker from 'emoji-picker-react';
 
 function Groupchat() {
     const { groupid } = useParams();
@@ -23,6 +24,9 @@ function Groupchat() {
     const [filepreview, setfilepreview] = useState(null)
     const fileinputref = useRef(null)
     const max_size = 10 * 1024 * 1024;
+    const [selectedmsg, setselectedmsg] = useState(null)
+    const emojiPickerref = useRef()
+    const [showemojipicker, setshowemojipicker] = useState(false)
 
 
     useEffect(() => {
@@ -57,15 +61,23 @@ function Groupchat() {
 
         socket.on("recivegroupmessage", handlenewmessage);
 
+        socket.on("messageupdatedgroup", (updatedmessage) => {
+            console.log(updatedmessage);
+            setmessages(prev => prev.map(msg => msg._id?.toString() === updatedmessage._id?.toString() ? { ...msg, reactions: updatedmessage.reactions || [] } : msg))
+
+
+        })
+
         return () => {
             socket.emit("leavegroup", groupid)
             socket.off("recivegroupmessage")
             socket.off("usertyping")
             socket.off("readupdate-group")
+            socket.off("messageupdatedgroup")
 
         }
 
-    }, [groupid, socket])
+    }, [groupid, socket, user._id])
 
 
     useEffect(() => {
@@ -187,9 +199,9 @@ function Groupchat() {
         try {
             const formdata = new FormData();
             formdata.append("file", file)
-           formdata.append("userid", user._id)
+            formdata.append("userid", user._id)
             formdata.append("groupid", groupid)
-           // formdata.append("contactid", contactid)
+            // formdata.append("contactid", contactid)
 
             const res = await api.post('/upload/group', formdata, {
                 headers: {
@@ -210,21 +222,34 @@ function Groupchat() {
 
     const renderfilemessage = (message) => {
         const file = message.file;
-        console.log(message);
+        //console.log(message);
         if (!file) return null;
 
         if (file.type?.startsWith('image/')) {
             return (
                 <div className='max-w-xs md:max-w-md'>
                     <p className={`text-sm font-medium`}>
-                    {message.sender._id.toString() === user._id ? "you" : message.sender.username}
-                </p>
+                        {message.sender._id === user._id ? "you" : message.sender.username}
+                    </p>
                     <img src={`http://localhost:5000/${file.path}`} alt={file.name} className='rounded-lg shadow-sm' />
                     <div className='flex items-center justify-end mt-1 space-x-1'>
                         <span className='text-xs text-black '>
                             {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                     </div>
+
+                    {message.reactions?.length > 0 && (
+                        <div className='flex flex-wrap gap-1 mt-1 justify-end'>
+                            {message.reactions?.map((reaction, index) => (
+                                <div key={index} className='flex items-center px-2 py-0.5 bg-white bg-opacity-20 rounded-full'>
+                                    <span className='text-xs'>{reaction.emoji}</span>
+                                    {reaction.userids?.length > 1 && (
+                                        <span className='ml-1 text-xs '>{reaction.userids.length}</span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )
         }
@@ -233,8 +258,8 @@ function Groupchat() {
             return (
                 <div className='max-w-xs md:max-w-md'>
                     <p className={`text-sm font-medium`}>
-                    {message.sender._id.toString() === user._id ? "you" : message.sender.username}
-                </p>
+                        {message.sender._id === user._id ? "you" : message.sender.username}
+                    </p>
                     <video controls className='rounded-lg shadow-sm' >
                         <source src={`http://localhost:5000/${file.path}`} type={file.type} />
                     </video>
@@ -243,6 +268,19 @@ function Groupchat() {
                             {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                     </div>
+
+                    {message.reactions?.length > 0 && (
+                        <div className='flex flex-wrap gap-1 mt-1 justify-end'>
+                            {message.reactions?.map((reaction, index) => (
+                                <div key={index} className='flex items-center px-2 py-0.5 bg-white bg-opacity-20 rounded-full'>
+                                    <span className='text-xs'>{reaction.emoji}</span>
+                                    {reaction.userids?.length > 1 && (
+                                        <span className='ml-1 text-xs '>{reaction.userids.length}</span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )
         }
@@ -250,7 +288,7 @@ function Groupchat() {
         return (
             <div className='max-w-xs p-3 bg-gray-100 rounded-lg shadow-sm'>
                 <p className={`text-sm font-medium`}>
-                    {message.sender._id.toString() === user._id ? "you" : message.sender.username}
+                    {message.sender._id === user._id ? "you" : message.sender.username}
                 </p>
                 <a href={`http://localhost:5000/${file.path}`} download={message.filename} className='flex items-center space-x-2' >
                     <div className='p-2 bg-white rounded'>
@@ -268,6 +306,19 @@ function Groupchat() {
                         {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                 </div>
+
+                {message.reactions?.length > 0 && (
+                    <div className='flex flex-wrap gap-1 mt-1 justify-end'>
+                        {message.reactions?.map((reaction, index) => (
+                            <div key={index} className='flex items-center px-2 py-0.5 bg-white bg-opacity-20 rounded-full'>
+                                <span className='text-xs'>{reaction.emoji}</span>
+                                {reaction.userids?.length > 1 && (
+                                    <span className='ml-1 text-xs '>{reaction.userids.length}</span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
         )
     }
@@ -277,20 +328,54 @@ function Groupchat() {
 
             <div className={`inline-block p-2 rounded-lg ${message.sender._id?.toString() === user._id ? "bg-blue-500 text-white" : "bg-gray-200"}`}>
                 <p className={`text-sm font-medium`}>
-                    {message.sender._id.toString() === user._id ? "you" : message.sender.username}
+                    {message.sender._id?.toString() === user._id ? "you" : message.sender.username}
                 </p>
                 <p>{message.message}</p>
 
                 <p className='text-xs opacity-70 mt-1'>
                     {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </p>
+
+                {message.reactions?.length > 0 && (
+                    <div className='flex flex-wrap gap-1 mt-1 justify-end'>
+                        {message.reactions?.map((reaction, index) => (
+                            <div key={index} className='flex items-center px-2 py-0.5 bg-white bg-opacity-20 rounded-full'>
+                                <span className='text-xs'>{reaction.emoji}</span>
+                                {reaction.userids?.length > 1 && (
+                                    <span className='ml-1 text-xs '>{reaction.userids.length}</span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+
             </div>
 
         )
     }
 
 
+    const handledoubleclick = (messageid) => {
+        setselectedmsg(messageid)
+        setshowemojipicker(true)
+    }
 
+    const hamdleemojiclick = (emojidata) => {
+        if (selectedmsg) {
+
+            socket.emit("addreactiongroup", {
+                messageid: selectedmsg,
+                emoji: emojidata.emoji,
+                userid: user._id,
+                groupid
+            })
+
+        }
+        setshowemojipicker(false)
+        //fetchmessages()
+
+    }
 
 
 
@@ -308,9 +393,20 @@ function Groupchat() {
                 {
                     messages.map((message) => (
 
-                        <div key={message._id} className={`flex ${message.sender._id.toString() === user._id ? "justify-end" : "justify-start"}`}>
+                        <div key={message._id} className={`flex ${message.sender._id?.toString() === user._id ? "justify-end" : "justify-start"}`}
+                            onDoubleClick={() => handledoubleclick(message._id?.toString())}
+                            ref={emojiPickerref}
+                        >
 
                             {message.file ? renderfilemessage(message) : rendertextmessage(message)}
+
+                            {
+                                showemojipicker && selectedmsg === message._id && (
+                                    <div className='absolute bottom-[11%] mb-4  right-162 z-10 shadow-lg'>
+                                        <EmojiPicker onEmojiClick={hamdleemojiclick} width={300} height={350} previewConfig={{ showPreview: false }} />
+                                    </div>
+                                )
+                            }
 
                         </div>
 

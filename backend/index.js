@@ -168,6 +168,32 @@ socket.on("addreaction", async ({messageid,emoji,userid}) => {
   
 } )
 
+//emoji reaction group
+socket.on("addreactiongroup", async ({messageid,emoji,userid,groupid}) => {
+    try {
+        const message = await Groupmessages.findById(messageid)
+
+        const reactionindex = message.reactions.findIndex(r => r.emoji === emoji);
+        if(reactionindex >= 0){
+            if(!message.reactions[reactionindex].userids.includes(userid)){
+                message.reactions[reactionindex].userids.push(userid)
+            }
+        }else{
+            message.reactions.push({emoji, userids: [userid]})
+        }
+    
+        const updatedmessage = await message.save()
+       // const roomname = `${[message.sender,message.reciver].sort().join('_')}`;
+      // console.log(updatedmessage);
+        io.to(`group_${groupid}`).emit("messageupdatedgroup", updatedmessage)
+    } catch (error) {
+        console.log(error);
+    }
+  
+} )
+
+
+
 
 //read recipt
 socket.on("markmessageasread", async   ({messageids,readerid}) => {
@@ -345,7 +371,7 @@ socket.on("markasread-group",  ({messageids,readerid,groupid}) => {
             })
 
             await newmessage.save();
-
+            console.log(newmessage);
             const populatedmsg = await Groupmessages.populate(newmessage,{ path:"sender", select: "username"})
             
             io.to(`group_${groupid}`).emit("recivegroupmessage", populatedmsg)
