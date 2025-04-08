@@ -14,7 +14,8 @@ const path = require("path");
 const multer = require("multer");
 const {Server} = require("socket.io")
 const auth = require("./middleware/authmiddleware")
-const upload = require("./middleware/uploadimage")
+const upload = require("./middleware/uploadimage");
+const { timeStamp } = require("console");
 
 
 dotenv.config();
@@ -116,6 +117,40 @@ app.post("/api/upload/group", upload.single("file"),async (req,res) => {
         res.status(400).json({error: error})
     }
 } )
+
+//search group
+
+app.get("/api/search/group",auth,async (req,res) => {
+    const userid = req.user.id;
+    
+    try {
+
+        const usergroups = await Group.find({members: userid}).select("_id")
+
+        
+       
+        const result = await Groupmessages.find({
+            $and:[
+                {
+                    $or: [
+                        {message: {$regex: req.query.q, $options: "i" }}
+                    ]
+                },
+                {
+                    $or: [
+                        {sender: userid},
+                        {group: {$in: usergroups.map(g => g._id)}}
+                    ]
+                }
+            ]
+        }).populate({path: "sender", select: "username"}).sort({timestap: -1})
+     
+        res.json(result)
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({msg:"error seraching"})
+    }
+})
 
 
 
@@ -371,9 +406,9 @@ socket.on("markasread-group",  ({messageids,readerid,groupid}) => {
             })
 
             await newmessage.save();
-            console.log(newmessage);
-            const populatedmsg = await Groupmessages.populate(newmessage,{ path:"sender", select: "username"})
             
+            const populatedmsg = await Groupmessages.populate(newmessage,{ path:"sender", select: "username"})
+            console.log(populatedmsg);
             io.to(`group_${groupid}`).emit("recivegroupmessage", populatedmsg)
 
         } catch (error) {

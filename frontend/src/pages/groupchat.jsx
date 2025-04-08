@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { FaPaperclip, FaTimes, FaCheck, FaCheckDouble, FaFilePdf, FaRegFilePdf } from "react-icons/fa"
 import EmojiPicker from 'emoji-picker-react';
 
+
 function Groupchat() {
     const { groupid } = useParams();
     const { user } = useAuth();
@@ -27,6 +28,8 @@ function Groupchat() {
     const [selectedmsg, setselectedmsg] = useState(null)
     const emojiPickerref = useRef()
     const [showemojipicker, setshowemojipicker] = useState(false)
+    const [searchtext, setsearchtext] = useState("");
+    const [searchedmsg, setseachedmsg] = useState([]);
 
 
     useEffect(() => {
@@ -44,6 +47,9 @@ function Groupchat() {
             }
         }
         fetchdata();
+
+
+
 
 
         //read recipt
@@ -82,7 +88,7 @@ function Groupchat() {
 
     useEffect(() => {
 
-        const unreadmessages = messages.filter(msg => msg.sender._id.toString() !== user._id && !readrecipts[msg._id.toString()]?.includes(user._id))
+        const unreadmessages = messages.filter(msg => msg.sender._id?.toString() !== user._id && !readrecipts[msg._id?.toString()]?.includes(user._id))
         if (unreadmessages.length > 0) {
             socket.emit("markasread-group", {
                 messageids: unreadmessages.map((msg) => msg._id.toString()),
@@ -377,6 +383,24 @@ function Groupchat() {
 
     }
 
+    const search = async (text) => {
+        try {
+         setsearchtext(text)
+            if(text.trim() === ""){
+               setseachedmsg([])
+            }else{
+                const res = await api.get(`/search/group`, { params: { q: text.trim() || undefined } })
+                //  setmessages(res.data)
+                setseachedmsg(res.data)
+    
+            }
+
+
+        } catch (error) {
+            console.log(error);
+        }
+    }
+
 
 
     return (
@@ -386,12 +410,14 @@ function Groupchat() {
                 <p className='text-sm text-gray-500'>{group?.members?.length} members</p>
             </div>
 
-
+            <Input type={Text} className="w-[400px]" onChange={(e) => {
+               search(e.target.value)
+                 }}   value={searchtext} />
 
 
             <div className='flex-1 overflow-y-auto p-4 space-y-4 ' style={{ scrollbarWidth: "none" }} >
                 {
-                    messages.map((message) => (
+                   ( searchtext ? searchedmsg : messages).map((message) => (
 
                         <div key={message._id} className={`flex ${message.sender._id?.toString() === user._id ? "justify-end" : "justify-start"}`}
                             onDoubleClick={() => handledoubleclick(message._id?.toString())}
