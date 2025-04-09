@@ -175,6 +175,7 @@ const singletypingusers = new Map();
 const onlineusers = new Map();
 const readrecipts = new Map();
 const readreciptsgroup = new Map();
+const activegroups = {};
 
 io.on("connection", (socket) => {
     console.log("user connected");
@@ -266,24 +267,7 @@ if(senderid){
   // })
 })
 
-//read recipt group
-socket.on("markasread-group",  ({messageids,readerid,groupid}) => {
-    
-      messageids.forEach((messageid) => {
-          if(!readreciptsgroup.has(messageid)){
-              readreciptsgroup.set(messageid, new Set())
-          }
-          readreciptsgroup.get(messageid).add(readerid)
-      
-          io.to(`group_${groupid}`).emit("readupdate-group", {
-             messageid,
-             readby: Array.from( readreciptsgroup.get(messageid))
-          })
 
-           
-      })
-  
-  })
 
 
 //online 
@@ -359,11 +343,35 @@ socket.on("markasread-group",  ({messageids,readerid,groupid}) => {
 
     socket.on("joingroup", (groupid) => {
         socket.join(`group_${groupid}`)
+        activegroups[groupid] = activegroups[groupid] || new Set();
+        activegroups[groupid].add(socket.userid)
     })
 
     socket.on("leavegroup", (groupid) => {
         socket.leave(`group_${groupid}`)
+        if(activegroups[groupid]){
+            activegroups[groupid].delete(socket.userid)
+        }
     })
+
+
+    //read recipt group
+socket.on("markasread-group", async ({messageids,groupid}) => {
+   
+    const othermembersactive = Array.from(activegroups[groupid] || []).some(id => id !== socket.userid)
+
+   if(othermembersactive){
+    await Groupmessages.updateMany(
+        {_id: {$in: messageids}},
+        { read: true}
+    )
+
+    const updatedmessages = await Groupmessages.find({_id: {$in: messageids}}).populate("sender", "username")
+     
+    io.to(`group_${groupid}`).emit("readupdategroup", updatedmessages)
+   }
+
+  })
 
     socket.on("sendmessage",async ({room,message}) => {
         try {

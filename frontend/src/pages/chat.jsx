@@ -10,6 +10,7 @@ import api from "../api";
 import { FaPaperclip, FaTimes, FaCheck, FaCheckDouble, FaFilePdf, FaRegFilePdf } from "react-icons/fa"
 import EmojiPicker from 'emoji-picker-react';
 import { FaSmile } from 'react-icons/fa';
+import { IoMdSearch } from "react-icons/io";
 
 
 function Chat() {
@@ -33,6 +34,8 @@ function Chat() {
     const [loading, setloading] = useState(true)
     const [selectedmsg, setselectedmsg] = useState(null)
     const emojiPickerref = useRef()
+    const [searchtext, setsearchtext] = useState("");
+        const [searchedmsg, setseachedmsg] = useState([]);
 
 
 
@@ -351,14 +354,36 @@ function Chat() {
 
         )
     }
+
+    const search = async (text) => {
+        try {
+         setsearchtext(text)
+            if(text.trim() === ""){
+               setseachedmsg([])
+            }else{
+             const result = messages.filter(message => message.message?.toLowerCase().includes(text?.toLowerCase()))
+             setseachedmsg(result)
+            }
+
+
+        } catch (error) {
+            console.log(error);
+        }
+    }
+
+
     if (loading) return <div className='p-4'>Loading message...</div>
     return (
         <div className=' flex flex-col h-screen p-6'>
 
+            <Input type={Text} className="w-[600px] mx-auto " onChange={(e) => {
+                           search(e.target.value)
+                             }}   value={searchtext} placeholder="Search Messages" />
+             <IoMdSearch  className="text-2xl relative left-[996px] bottom-[30px]"  />
 
             <div className='flex-1 overflow-y-auto pb-4 space-y-3 ' ref={emojiPickerref} style={{ scrollbarWidth: "none" }}  >
                 {
-                    messages.map((message) => (
+                    ( searchtext ? searchedmsg : messages).map((message) => (
                         <div key={message._id} className={`flex ${message.sender === user._id ? "justify-end" : "justify-start"}`}
                             onDoubleClick={() => handledoubleclick(message._id)}    >
 

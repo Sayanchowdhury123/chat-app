@@ -20,7 +20,9 @@ const groupmessageschema = new mongoose.Schema({
                     ref:"User"
                 }]
             }
-        ]
+        ],
+
+        read: {type: String, default: false}
 })
 
 

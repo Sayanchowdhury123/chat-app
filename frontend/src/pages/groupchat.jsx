@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { FaPaperclip, FaTimes, FaCheck, FaCheckDouble, FaFilePdf, FaRegFilePdf } from "react-icons/fa"
 import EmojiPicker from 'emoji-picker-react';
+import { IoMdSearch } from "react-icons/io";
 
 
 function Groupchat() {
@@ -30,6 +31,7 @@ function Groupchat() {
     const [showemojipicker, setshowemojipicker] = useState(false)
     const [searchtext, setsearchtext] = useState("");
     const [searchedmsg, setseachedmsg] = useState([]);
+    const[isactive, setisactive] = useState(false)
 
 
     useEffect(() => {
@@ -49,16 +51,6 @@ function Groupchat() {
         fetchdata();
 
 
-
-
-
-        //read recipt
-        socket.on("readupdate-group", ({ messageid, readby }) => {
-            setreadrecipts(prev => ({ ...prev, [messageid.toString()]: readby }))
-
-        })
-
-
         socket.on("usertyping", ({ userids }) => {
             settypingusers(userids)
         })
@@ -68,7 +60,7 @@ function Groupchat() {
         socket.on("recivegroupmessage", handlenewmessage);
 
         socket.on("messageupdatedgroup", (updatedmessage) => {
-            console.log(updatedmessage);
+            
             setmessages(prev => prev.map(msg => msg._id?.toString() === updatedmessage._id?.toString() ? { ...msg, reactions: updatedmessage.reactions || [] } : msg))
 
 
@@ -78,37 +70,54 @@ function Groupchat() {
             socket.emit("leavegroup", groupid)
             socket.off("recivegroupmessage")
             socket.off("usertyping")
-            socket.off("readupdate-group")
+            
             socket.off("messageupdatedgroup")
 
         }
 
     }, [groupid, socket, user._id])
 
+    useEffect(() => {
+          //read recipt
+          socket.on("readupdategroup", ( updatedmessages) => {
+            console.log(updatedmessages);
+            setmessages(prev => prev.map(msg => {
+                const updatedmsg = updatedmessages.find(u._id?.toString() === msg._id?.toString() )
+                return updatedmsg || msg
+            }))
+            
+            
+        })
+
+        return () => {
+            socket.off("readupdategroup")
+        }
+    },[])
+
 
     useEffect(() => {
 
-        const unreadmessages = messages.filter(msg => msg.sender._id?.toString() !== user._id && !readrecipts[msg._id?.toString()]?.includes(user._id))
-        if (unreadmessages.length > 0) {
-            socket.emit("markasread-group", {
-                messageids: unreadmessages.map((msg) => msg._id.toString()),
-                readerid: user._id,
-                groupid
-            })
-        }
+            const unreadmessageids = messages.filter(msg => !msg.read && msg.sender._id?.toString() !== user._id).map(msg => msg._id?.toString())
 
-    }, [messages, readrecipts, groupid, user._id, socket])
+            if (unreadmessageids.length > 0 && socket) {
+                socket.emit("markasread-group", {
+                    messageids: unreadmessageids,
+                    groupid
+                })
+            }
+        
+    }, [messages,groupid,user._id])
 
 
     const renderreadstatus = (message) => {
-        if (message.sender._id.toString() !== user._id) return null;
-        const isread = readrecipts[message._id.toString()]?.length > 0;
+        if (message.sender._id?.toString() !== user._id) return null;
+       
 
 
         return (
             <div className='text-right mt-1'>
-                <span className={`text-xs ${isread ? "text-green-500 font-medium" : "text-gray-400"}`}>
-                    {isread ? "Seen" : "Sent"}
+                <span className={`text-xs ${message.read  ? "text-green-500 font-medium" : "text-gray-400"}`}>
+                    {message.read  ? "Seen" : "Sent"}
                 </span>
             </div>
         )
@@ -354,7 +363,8 @@ function Groupchat() {
                         ))}
                     </div>
                 )}
-
+                  
+            
 
             </div>
 
@@ -408,11 +418,14 @@ function Groupchat() {
             <div className='p-4 border-b'>
                 <h1 className='text-xl font-bold '>{group?.name}</h1>
                 <p className='text-sm text-gray-500'>{group?.members?.length} members</p>
+                
             </div>
 
-            <Input type={Text} className="w-[400px]" onChange={(e) => {
+            <Input type={Text} className="w-[600px] mx-auto mt-2 " onChange={(e) => {
                search(e.target.value)
-                 }}   value={searchtext} />
+                 }}   value={searchtext} placeholder="Search Group Messages" />
+
+                 <IoMdSearch  className="text-2xl relative left-[1023px] bottom-[30px]"  />
 
 
             <div className='flex-1 overflow-y-auto p-4 space-y-4 ' style={{ scrollbarWidth: "none" }} >
@@ -425,6 +438,7 @@ function Groupchat() {
                         >
 
                             {message.file ? renderfilemessage(message) : rendertextmessage(message)}
+                            {renderreadstatus(message)}
 
                             {
                                 showemojipicker && selectedmsg === message._id && (
