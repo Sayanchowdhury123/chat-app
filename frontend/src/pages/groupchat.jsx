@@ -364,7 +364,7 @@ function Groupchat() {
                     </div>
                 )}
                   
-            
+                  {renderreadstatus(message)}
 
             </div>
 
@@ -438,7 +438,7 @@ function Groupchat() {
                         >
 
                             {message.file ? renderfilemessage(message) : rendertextmessage(message)}
-                            {renderreadstatus(message)}
+                            
 
                             {
                                 showemojipicker && selectedmsg === message._id && (
