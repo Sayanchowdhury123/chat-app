@@ -21,6 +21,7 @@ function Contacts() {
     const { user } = useAuth();
     const Socket = useSocket();
     const [onlineusers, setonlineusers] = useState({});
+    const [isopen,setisopen] = useState(false);
 
 
     //for online/offline status
@@ -89,10 +90,10 @@ function Contacts() {
     return (
         <div className='p-6'>
             <h1 className='text-2xl font-bold mb-6'>Contacts</h1>
+            
             <div className='mb-6'>
                 <Input type={Text} placeholder="Enter username" value={contactusername} onChange={(e) => setcontactusername(e.target.value)} className="mr-4" />
                 <Button onClick={addcontact} className="mt-3">Add Contacts</Button>
-                <Button className="ml-4" onClick={() => navigate("/groups")}>Groupchats</Button>
             </div>
 
 

@@ -23,7 +23,12 @@ const[username,setusername] = useState("")
 
   }
   return (
-    <div className='flex items-center justify-center h-screen bg-gray-100'>
+    
+
+
+<div className='flex items-center justify-center h-screen bg-gray-100'>
+
+      
       <div className='bg-white p-8 rounded-lg shadow-md w-96'>
         <h1 className='text-2xl font-bold mb-6'>Login</h1>
         <form className='space-y-4' onSubmit={handle}>
@@ -33,9 +38,16 @@ const[username,setusername] = useState("")
 
           <Button type="submit" className="w-full">Login</Button>
         </form>
+        <Button className="w-full mt-4" onClick={() => navigate("/register")} >Register</Button>
       </div>
 
     </div>
+
+
+     
+      
+    
+ 
 
 
   );
