@@ -26,10 +26,15 @@ const[username,setusername] = useState("")
     
 
 
-<div className='flex items-center justify-center h-screen bg-gray-100'>
+<div className=' bg-gray-100  '>
 
-      
-      <div className='bg-white p-8 rounded-lg shadow-md w-96'>
+      <div className='text-right mr-6'>
+      <Button className=" mt-4" onClick={() => navigate("/register")} >Register</Button>
+      </div>
+
+   <div className='flex justify-center items-center h-[92vh]'>
+
+   <div className='bg-white p-8 rounded-lg shadow-md w-96'>
         <h1 className='text-2xl font-bold mb-6'>Login</h1>
         <form className='space-y-4' onSubmit={handle}>
           <Input type={Text} value={username} placeholder="Username" onChange={(e) => setusername(e.target.value)} className="mb-4" />
@@ -38,8 +43,11 @@ const[username,setusername] = useState("")
 
           <Button type="submit" className="w-full">Login</Button>
         </form>
-        <Button className="w-full mt-4" onClick={() => navigate("/register")} >Register</Button>
+       
       </div>
+
+   </div>
+   
 
     </div>
 

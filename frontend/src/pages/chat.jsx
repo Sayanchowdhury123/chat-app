@@ -11,6 +11,7 @@ import { FaPaperclip, FaTimes, FaCheck, FaCheckDouble, FaFilePdf, FaRegFilePdf }
 import EmojiPicker from 'emoji-picker-react';
 import { FaSmile } from 'react-icons/fa';
 import { IoMdSearch } from "react-icons/io";
+import { MdDelete } from "react-icons/md";
 
 
 function Chat() {
@@ -36,6 +37,7 @@ function Chat() {
     const emojiPickerref = useRef()
     const [searchtext, setsearchtext] = useState("");
         const [searchedmsg, setseachedmsg] = useState([]);
+       
 
 
 
@@ -370,7 +372,7 @@ function Chat() {
             console.log(error);
         }
     }
-
+ 
 
     if (loading) return <div className='p-4'>Loading message...</div>
     return (
@@ -391,11 +393,13 @@ function Chat() {
 
                             {
                                 showemojipicker && selectedmsg === message._id && (
-                                    <div className='absolute bottom-[11%] mb-4  right-162 z-10 shadow-lg'>
+                                    <div className='absolute bottom-[11%] mb-4  left-[250px] z-10 shadow-lg'>
                                         <EmojiPicker onEmojiClick={hamdleemojiclick} width={300} height={350} previewConfig={{ showPreview: false }} />
                                     </div>
                                 )
                             }
+
+                           
 
                         </div>
                     ))}

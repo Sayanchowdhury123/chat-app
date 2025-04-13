@@ -18,15 +18,13 @@ import Groupchat from './pages/groupchat'
 function App() {
 const {isauthinticated} = useAuth();
 
-  
- 
 
   return (
 
 
  <Router>
   <Routes>
-    <Route path='/login'  element={!isauthinticated ? <Login/> : <Navigate to="/" />} />
+    <Route path='/login'  element={<Login/>} />
     <Route path='/register' element={<Register/>} />
     <Route path='/' element={isauthinticated ? <Home/> : <Navigate to="/login" />} />
     <Route path='/contacts' element={isauthinticated ? <Contacts/> : <Navigate to="/login" />} />

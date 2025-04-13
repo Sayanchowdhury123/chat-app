@@ -22,12 +22,13 @@ function Contacts() {
     const Socket = useSocket();
     const [onlineusers, setonlineusers] = useState({});
     const [isopen,setisopen] = useState(false);
-
+    const userid = user?._id;
 
     //for online/offline status
     useEffect(() => {
+        console.log(userid);
 
-        Socket.emit("set-online", user._id)
+        Socket.emit("set-online", userid)
 
         Socket.on("online-users", (userids) => {
             setonlineusers(userids)

@@ -14,9 +14,12 @@ useEffect(() => {
     const token = localStorage.getItem("token");
     if(token){
         axios.defaults.headers.common['Authorization'] = token;
-        fetchuser();
+        setisauthincated(true)
+        fetchuser()
     } else{
         delete  axios.defaults.headers.common['Authorization'];
+        setisauthincated(false)
+       
     }
   
     
@@ -26,6 +29,7 @@ const fetchuser = async () => {
     try {
         const res = await api.get("/auth/user");
         setuser(res.data)
+      
     } catch (error) {
         console.log(error);
          
@@ -36,12 +40,13 @@ const fetchuser = async () => {
 const login = async (username,password) => {
     
         const res = await axios.post("http://localhost:5000/api/auth/login", {username,password});
-        console.log(res.data.token);
         localStorage.setItem("token",res.data.token);
         axios.defaults.headers.common['Authorization'] = res.data.token;
         setisauthincated(true)
          fetchuser();
+       
         alert("you are logged in")
+        
         
    
 }
