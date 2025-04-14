@@ -26,7 +26,7 @@ function Contacts() {
 
     //for online/offline status
     useEffect(() => {
-        console.log(userid);
+        
 
         Socket.emit("set-online", userid)
 

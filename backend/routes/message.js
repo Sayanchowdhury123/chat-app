@@ -46,4 +46,16 @@ router.get("/:conatctid", auth,async (req,res) => {
 })
 
 
+router.delete("/:messageid", auth, async (req,res) => {
+    console.log(req.params.messageid);
+    try {
+        await Message.findByIdAndDelete(req.params.messageid)
+    } catch (error) {
+        console.log(error);
+        res.status(500).send("server error")  
+      
+    }
+})
+
+
 module.exports = router;

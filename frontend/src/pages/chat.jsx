@@ -36,7 +36,9 @@ function Chat() {
     const [selectedmsg, setselectedmsg] = useState(null)
     const emojiPickerref = useRef()
     const [searchtext, setsearchtext] = useState("");
-        const [searchedmsg, setseachedmsg] = useState([]);
+    const [searchedmsg, setseachedmsg] = useState([]);
+    const[del, setdel] = useState(false)
+    let clicktimeout = null;
        
 
 
@@ -313,6 +315,7 @@ function Chat() {
     const handledoubleclick = (messageid) => {
         setselectedmsg(messageid)
         setshowemojipicker(true)
+        setdel(false)
     }
 
     const hamdleemojiclick = (emojidata) => {
@@ -372,6 +375,33 @@ function Chat() {
             console.log(error);
         }
     }
+
+
+    const handledel = (messageid) => {
+        setselectedmsg(messageid)
+        setdel(true)
+    }
+
+    const msgdelete = async (messageid) => {
+        setmessages(prev => prev.filter((msg) => msg._id !== messageid))
+       await api.delete(`/messages/${messageid}`)
+       
+        setdel(false)
+    }
+
+    const handleclick = (messagesid) => {
+        if(clicktimeout !== null){
+            clearTimeout(clicktimeout)
+            clicktimeout = null;
+            handledoubleclick(messagesid)
+        } else{
+            clicktimeout = setTimeout(() => {
+                handledel(messagesid)
+                clicktimeout = null;
+                
+            }, 250);
+        }
+    }
  
 
     if (loading) return <div className='p-4'>Loading message...</div>
@@ -387,21 +417,33 @@ function Chat() {
                 {
                     ( searchtext ? searchedmsg : messages).map((message) => (
                         <div key={message._id} className={`flex ${message.sender === user._id ? "justify-end" : "justify-start"}`}
-                            onDoubleClick={() => handledoubleclick(message._id)}    >
+                            onClick={() => handleclick(message._id)} >
 
                             {message.file ? renderfilemessage(message) : rendertextmessage(message)}
 
                             {
                                 showemojipicker && selectedmsg === message._id && (
-                                    <div className='absolute bottom-[11%] mb-4  left-[250px] z-10 shadow-lg'>
+                                    <div className='absolute bottom-[11%] mb-4  z-10 shadow-lg'>
                                         <EmojiPicker onEmojiClick={hamdleemojiclick} width={300} height={350} previewConfig={{ showPreview: false }} />
                                     </div>
+                                )
+                            }
+
+                            {
+                                del && selectedmsg === message._id && (
+
+                                    <MdDelete  onClick={() => msgdelete(message._id)}  className='relative top-1 '/>
                                 )
                             }
 
                            
 
                         </div>
+
+                
+                        
+
+
                     ))}
                 <div ref={messageendref} />
             </div>

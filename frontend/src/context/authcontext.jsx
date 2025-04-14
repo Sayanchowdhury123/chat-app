@@ -14,11 +14,11 @@ useEffect(() => {
     const token = localStorage.getItem("token");
     if(token){
         axios.defaults.headers.common['Authorization'] = token;
-        setisauthincated(true)
+      
         fetchuser()
     } else{
         delete  axios.defaults.headers.common['Authorization'];
-        setisauthincated(false)
+      
        
     }
   
