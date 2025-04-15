@@ -12,6 +12,9 @@ import EmojiPicker from 'emoji-picker-react';
 import { FaSmile } from 'react-icons/fa';
 import { IoMdSearch } from "react-icons/io";
 import { MdDelete } from "react-icons/md";
+import { FaEdit } from "react-icons/fa";
+import { Textarea } from '@/components/ui/textarea';
+import { MdCancel } from "react-icons/md";
 
 
 function Chat() {
@@ -37,9 +40,16 @@ function Chat() {
     const emojiPickerref = useRef()
     const [searchtext, setsearchtext] = useState("");
     const [searchedmsg, setseachedmsg] = useState([]);
-    const[del, setdel] = useState(false)
+    const [del, setdel] = useState(false)
     let clicktimeout = null;
-       
+    const [edittext, setedittext] = useState("");
+    const [showedit, setshowedit] = useState(false)
+    const [editbox, seteditbox] = useState(false)
+    const [showcancel, setshowcancel] = useState(false)
+    const [editfile,seteditfile] = useState(null)
+    const [filechange,setfilechange] = useState(false)
+
+
 
 
 
@@ -67,7 +77,7 @@ function Chat() {
 
 
     const handlenewmessage = (message) => {
-        
+
         setmessages((prev) => [...prev, message])
     }
 
@@ -84,7 +94,7 @@ function Chat() {
         });
 
         socket.on("messageupdated", (updatedmessage) => {
-            
+
             setmessages(prev => prev.map(msg => msg._id === updatedmessage._id ? { ...msg, reactions: updatedmessage.reactions || [] } : msg))
 
 
@@ -119,6 +129,10 @@ function Chat() {
             uploadfile()
             setfilepreview(null)
 
+        } else if(editfile){
+           changingfile()
+           setfilepreview(null)
+           setfilechange(false)
         } else {
             const message = {
                 sender: user._id,
@@ -162,6 +176,7 @@ function Chat() {
 
 
     const handlefilechange = (e) => {
+        console.log("original file");
         const selectedfile = e.target.files[0];
         if (!selectedfile) return;
 
@@ -185,6 +200,7 @@ function Chat() {
     const clearfile = () => {
         setfile(null)
         setfilepreview(null)
+        seteditfile(null)
         if (fileinputref.current) fileinputref.current.value = '';
 
     }
@@ -215,12 +231,15 @@ function Chat() {
     }
 
 
+  
+
+
     const renderfilemessage = (message) => {
         const file = message.file;
 
         if (!file) return null;
 
-        if (file.type?.startsWith('image/')) {
+        if (file?.type?.startsWith('image/')) {
             return (
                 <div className='max-w-xs md:max-w-md'>
                     <img src={`http://localhost:5000/${file.path}`} alt={file.name} className='rounded-lg shadow-sm' />
@@ -246,7 +265,7 @@ function Chat() {
             )
         }
 
-        if (file.type?.startsWith('video/')) {
+        if (file?.type?.startsWith('video/')) {
             return (
                 <div className='max-w-xs md:max-w-md'>
                     <video controls className='rounded-lg shadow-sm' >
@@ -278,7 +297,7 @@ function Chat() {
             <div className='max-w-xs p-3 bg-gray-100 rounded-lg shadow-sm'>
                 <a href={`http://localhost:5000/${file.path}`} download={message.filename} className='flex items-center space-x-2' >
                     <div className='p-2 bg-white rounded'>
-                        {file.type?.includes('pdf') ? (<FaFilePdf className='text-xs' />) : (<FaRegFilePdf className='text-xs' />)}
+                        {file?.type?.includes('pdf') ? (<FaFilePdf className='text-xs' />) : (<FaRegFilePdf className='text-xs' />)}
                     </div>
                     <div>
                         <p className='font-medium truncate'>{message.filename}</p>
@@ -316,6 +335,8 @@ function Chat() {
         setselectedmsg(messageid)
         setshowemojipicker(true)
         setdel(false)
+        setshowedit(false)
+        setshowcancel(false)
     }
 
     const hamdleemojiclick = (emojidata) => {
@@ -362,12 +383,12 @@ function Chat() {
 
     const search = async (text) => {
         try {
-         setsearchtext(text)
-            if(text.trim() === ""){
-               setseachedmsg([])
-            }else{
-             const result = messages.filter(message => message.message?.toLowerCase().includes(text?.toLowerCase()))
-             setseachedmsg(result)
+            setsearchtext(text)
+            if (text.trim() === "") {
+                setseachedmsg([])
+            } else {
+                const result = messages.filter(message => message.message?.toLowerCase().includes(text?.toLowerCase()))
+                setseachedmsg(result)
             }
 
 
@@ -384,39 +405,118 @@ function Chat() {
 
     const msgdelete = async (messageid) => {
         setmessages(prev => prev.filter((msg) => msg._id !== messageid))
-       await api.delete(`/messages/${messageid}`)
-       
+        await api.delete(`/messages/${messageid}`)
+
         setdel(false)
     }
 
     const handleclick = (messagesid) => {
-        if(clicktimeout !== null){
+        if (clicktimeout !== null) {
             clearTimeout(clicktimeout)
             clicktimeout = null;
             handledoubleclick(messagesid)
-        } else{
+        } else {
             clicktimeout = setTimeout(() => {
                 handledel(messagesid)
+                handledit(messagesid)
+                handlecancel(messagesid)
                 clicktimeout = null;
-                
+
             }, 250);
         }
     }
- 
+
+    const handlecancel = (messageid) => {
+        setselectedmsg(messageid)
+        setshowcancel(true)
+    }
+
+    const handledit = (messageid) => {
+        setselectedmsg(messageid)
+        setshowedit(true)
+
+    }
+
+    const msgedit = async (messageid) => {
+        const upsatedmsg = await api.put(`/messages/${messageid}`, { edittext })
+        setmessages(prev => prev.map((msg) => msg._id === upsatedmsg.data._id ? upsatedmsg.data : msg))
+        setshowedit(false)
+        setedittext("")
+        seteditbox(false)
+        setdel(false)
+        setshowcancel(false)
+
+
+    }
+
+    const handlechangedfile = (e) => {
+        console.log("changed file");
+        const selectedfile = e.target.files[0];
+        if (!selectedfile) return;
+
+        if (selectedfile.size > max_size) {
+            alert("file size exceeds 10Mb")
+            return;
+        }
+        seteditfile(selectedfile)
+
+    }
+
+
+    const changingfile = async () => {
+        if (!editfile) return;
+
+        try {
+            const formdata = new FormData();
+            formdata.append("file", editfile)
+            formdata.append("userid", user._id)
+            formdata.append("room", room)
+            formdata.append("contactid", contactid)
+            formdata.append("messageid", selectedmsg)
+
+            const res = await api.put('/upload', formdata, {
+                headers: {
+                    "Content-Type": "multipart/form-data"
+                }
+            })
+
+            setmessages(prev => prev.map((msg) => msg._id === selectedmsg ? res.data : msg))
+
+
+
+            clearfile()
+        } catch (error) {
+            console.log("upload failed", error);
+        }
+
+    }
+
+
+
+
+
 
     if (loading) return <div className='p-4'>Loading message...</div>
     return (
         <div className=' flex flex-col h-screen p-6'>
 
             <Input type={Text} className="w-[600px] mx-auto " onChange={(e) => {
-                           search(e.target.value)
-                             }}   value={searchtext} placeholder="Search Messages" />
-             <IoMdSearch  className="text-2xl relative left-[996px] bottom-[30px]"  />
+                search(e.target.value)
+            }} value={searchtext} placeholder="Search Messages" />
+            <IoMdSearch className="text-2xl relative left-[996px] bottom-[30px]" />
 
-            <div className='flex-1 overflow-y-auto pb-4 space-y-3 ' ref={emojiPickerref} style={{ scrollbarWidth: "none" }}  >
+
+
+
+            <div className={`flex-1 overflow-y-auto pb-4 space-y-3 ${editbox ? "backdrop: blur-sm" : ""} transition-all `} ref={emojiPickerref} style={{ scrollbarWidth: "none" }}  >
+
+
+
+
+
                 {
-                    ( searchtext ? searchedmsg : messages).map((message) => (
-                        <div key={message._id} className={`flex ${message.sender === user._id ? "justify-end" : "justify-start"}`}
+                    (searchtext ? searchedmsg : messages).map((message) => (
+                        <div key={message._id} className={`flex ${message.sender === user._id ? "justify-end" : "justify-start"} transition-all `}
                             onClick={() => handleclick(message._id)} >
 
                             {message.file ? renderfilemessage(message) : rendertextmessage(message)}
@@ -429,24 +529,79 @@ function Chat() {
                                 )
                             }
 
-                            {
-                                del && selectedmsg === message._id && (
 
-                                    <MdDelete  onClick={() => msgdelete(message._id)}  className='relative top-1 '/>
-                                )
-                            }
 
-                           
+                            <div className='flex flex-col gap-1'>
+
+
+
+                                {
+                                    del && selectedmsg === message._id && message.sender === user._id && (
+
+                                        <MdDelete onClick={() => msgdelete(message._id)} className='relative  transition-all ' />
+                                    )
+                                }
+
+
+                                {
+                                    showedit && message.sender === user._id && selectedmsg === message._id && message.message && (
+                                        <FaEdit className='relative left-[2px]    transition-all ' onClick={() => seteditbox(true)} />
+                                    )
+                                }
+
+{
+                                    showedit && message.sender === user._id && selectedmsg === message._id && message.file && (
+                                        <FaEdit className='relative left-[2px]    transition-all ' onClick={() => 
+                                            {
+                                                fileinputref.current.click()
+                                                setfilechange(true)
+                                                setselectedmsg(message._id)
+                                            }} />
+                                    )
+                                }
+
+
+                                {
+                                    showcancel && selectedmsg === message._id && message.sender === user._id && (
+                                        <MdCancel onClick={(e) => {
+                                            e.stopPropagation()
+                                            setselectedmsg(null)
+                                            setdel(false)
+                                            setshowedit(false)
+                                            setshowcancel(false)
+
+                                        }}
+
+                                            className='relative    transition-all ' />
+                                    )
+                                }
+                            </div>
+
 
                         </div>
-
-                
-                        
-
 
                     ))}
                 <div ref={messageendref} />
             </div>
+
+            {
+                editbox && (
+                    <div className='flex justify-center'>
+                        <div className='z-100 relative bottom-62 ' >
+                            <Textarea onChange={(e) => setedittext(e.target.value)} value={edittext} placeholder="Enter text..." className=" w-80 h-40 bg-white " />
+                            <Button onClick={() => msgedit(selectedmsg)} className="mt-2" >Edit</Button>
+                            <Button onClick={() => {
+                                seteditbox(false)
+                                setdel(false)
+                                setshowedit(false)
+                                setedittext("")
+                                setshowcancel(false)
+                            }} className="ml-2" >Cancel</Button>
+                        </div>
+                    </div>
+
+                )
+            }
 
             {
                 filepreview && (
@@ -455,20 +610,20 @@ function Chat() {
                             <FaTimes />
                         </button>
 
-                        {file.type?.startsWith('image/') ? (
+                        {file?.type?.startsWith('image/') ? (
                             <img src={filepreview} alt="preview" className='h-32 rounded' />
-                        ) : file.type?.startsWith('video/') ? (
+                        ) : file?.type?.startsWith('video/') ? (
                             <video className='h-32 rounded'>
-                                <source src={filepreview} type={file.type} />
+                                <source src={filepreview} type={file?.type} />
                             </video>
                         ) : (
                             <div className='flex items-center p-2 bg-white rounded border'>
                                 <div className='text-2xl mr-2'>
-                                    {file.type?.includes('pdf') ? (<FaFilePdf className='text-xs' />) : (<FaRegFilePdf className='text-xs' />)}
+                                    {file?.type?.includes('pdf') ? (<FaFilePdf className='text-xs' />) : (<FaRegFilePdf className='text-xs' />)}
                                 </div>
                                 <div>
                                     <p className='font-medium'>{file.name}</p>
-                                    <p className='text-xs text-gray-500'>{(file.size / 1024 / 1024).toFixed(2)}MB</p>
+                                    <p className='text-xs text-gray-500'>{(file?.size / 1024 / 1024).toFixed(2)}MB</p>
                                 </div>
                             </div>
 
@@ -477,6 +632,9 @@ function Chat() {
                     </div>
                 )
             }
+
+
+
 
 
 
@@ -508,15 +666,16 @@ function Chat() {
 
                 <div className='flex items-center space-x-2'>
 
-                    <input type="file" ref={fileinputref} onChange={handlefilechange} accept="image/*,video/*,.pdf,.doc,docx" className="hidden" id="file-upload" />
+                    <input type="file" ref={fileinputref} onChange={ filechange ? handlechangedfile : handlefilechange} accept="image/*,video/*,.pdf,.doc,docx" className="hidden" id="file-upload" />
                     <label htmlFor="file-upload" className='p-2 text-gray-500 rounded-full hover:bg-gray-100 cursor-pointer'>
                         <FaPaperclip />
                     </label>
 
 
-                    <Input autoFocus value={newmessage} placeholder="Type a message..." className="mr-4" onChange={(e) => {
+                    <Input autoFocus value={newmessage} placeholder="Type a message..." id="i" className="mr-4" onChange={(e) => {
                         setnewmessage(e.target.value)
                         handletyping(e.target.value.length > 0)
+
                     }}
                         onKeyPress={(e) => e.key === "Enter" && sendmessage()}
 

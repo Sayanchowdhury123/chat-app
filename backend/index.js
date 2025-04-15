@@ -87,6 +87,35 @@ app.post("/api/upload", upload.single("file"),async (req,res) => {
     }
 } )
 
+app.put("/api/upload", upload.single("file"),async (req,res) => {
+    try {
+        
+       console.log(req.file);
+       const updatedfile = await Message.findByIdAndUpdate(req.body.messageid,
+        {$set: 
+            {file: {
+            name:req.file.originalname,
+            path: req.file.path,
+            type: req.file.mimetype,
+            size: req.file.size
+        }
+    }},
+         {new: true}  )
+
+        
+       res.json(updatedfile)
+        console.log(updatedfile);
+        
+    } catch (error) {
+        console.log(error);
+        res.status(400).json({error: error})
+    }
+} )
+
+
+
+
+
 
 app.post("/api/upload/group", upload.single("file"),async (req,res) => {
     try {

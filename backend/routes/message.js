@@ -45,9 +45,21 @@ router.get("/:conatctid", auth,async (req,res) => {
     }
 })
 
+router.put("/:messageid", auth, async (req,res) => {
+    const edittext = req.body.edittext;
+    try {
+        const updatedmsg = await Message.findByIdAndUpdate(req.params.messageid, {$set: {message: edittext}}, {new:true})
+        res.json(updatedmsg)
+
+    } catch (error) {
+        console.log(error);
+        res.status(500).send("server error") 
+    }
+})
+
 
 router.delete("/:messageid", auth, async (req,res) => {
-    console.log(req.params.messageid);
+   
     try {
         await Message.findByIdAndDelete(req.params.messageid)
     } catch (error) {

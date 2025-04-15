@@ -30,5 +30,34 @@ router.get("/:groupid/messages", auth,async (req,res) => {
 })
 
 
+router.delete("/:messageid", auth, async (req,res) => {
+  try {
+          await Groupmsg.findByIdAndDelete(req.params.messageid)
+      } catch (error) {
+          console.log(error);
+          res.status(500).send("server error")  
+        
+      }
+})
+
+
+
+router.put("/:messageid", auth, async (req,res) => {
+    console.log(req.params.messageid,req.body.edittext);
+    const edittext = req.body.edittext;
+    try {
+        const updatedmsg = await Groupmsg.findByIdAndUpdate(req.params.messageid, {$set: {message: edittext}}, {new:true}).populate("sender", "username").sort({timestamp: 1});
+        res.json(updatedmsg)
+
+    } catch (error) {
+        console.log(error);
+        res.status(500).send("server error") 
+    }
+})
+
+
+
+
+
 module.exports = router;
 

@@ -8,7 +8,10 @@ import { Button } from '@/components/ui/button';
 import { FaPaperclip, FaTimes, FaCheck, FaCheckDouble, FaFilePdf, FaRegFilePdf } from "react-icons/fa"
 import EmojiPicker from 'emoji-picker-react';
 import { IoMdSearch } from "react-icons/io";
-
+import { MdDelete } from "react-icons/md";
+import { FaEdit } from "react-icons/fa";
+import { Textarea } from '@/components/ui/textarea';
+import { MdCancel } from "react-icons/md";
 
 function Groupchat() {
     const { groupid } = useParams();
@@ -31,7 +34,13 @@ function Groupchat() {
     const [showemojipicker, setshowemojipicker] = useState(false)
     const [searchtext, setsearchtext] = useState("");
     const [searchedmsg, setseachedmsg] = useState([]);
-    const[isactive, setisactive] = useState(false)
+    const [isactive, setisactive] = useState(false)
+    const [del, setdel] = useState(false)
+    let clicktimeout = null;
+    const [edittext, setedittext] = useState("");
+    const [showedit, setshowedit] = useState(false)
+    const [editbox, seteditbox] = useState(false)
+    const [showcancel, setshowcancel] = useState(false)
 
 
     useEffect(() => {
@@ -60,7 +69,7 @@ function Groupchat() {
         socket.on("recivegroupmessage", handlenewmessage);
 
         socket.on("messageupdatedgroup", (updatedmessage) => {
-            
+
             setmessages(prev => prev.map(msg => msg._id?.toString() === updatedmessage._id?.toString() ? { ...msg, reactions: updatedmessage.reactions || [] } : msg))
 
 
@@ -70,7 +79,7 @@ function Groupchat() {
             socket.emit("leavegroup", groupid)
             socket.off("recivegroupmessage")
             socket.off("usertyping")
-            
+
             socket.off("messageupdatedgroup")
 
         }
@@ -78,46 +87,46 @@ function Groupchat() {
     }, [groupid, socket, user._id])
 
     useEffect(() => {
-          //read recipt
-          socket.on("readupdategroup", ( updatedmessages) => {
+        //read recipt
+        socket.on("readupdategroup", (updatedmessages) => {
             console.log(updatedmessages);
             setmessages(prev => prev.map(msg => {
-                const updatedmsg = updatedmessages.find(u._id?.toString() === msg._id?.toString() )
+                const updatedmsg = updatedmessages.find(u._id?.toString() === msg._id?.toString())
                 return updatedmsg || msg
             }))
-            
-            
+
+
         })
 
         return () => {
             socket.off("readupdategroup")
         }
-    },[])
+    }, [])
 
 
     useEffect(() => {
 
-            const unreadmessageids = messages.filter(msg => !msg.read && msg.sender._id?.toString() !== user._id).map(msg => msg._id?.toString())
+        const unreadmessageids = messages.filter(msg => !msg.read && msg.sender._id?.toString() !== user._id).map(msg => msg._id?.toString())
 
-            if (unreadmessageids.length > 0 && socket) {
-                socket.emit("markasread-group", {
-                    messageids: unreadmessageids,
-                    groupid
-                })
-            }
-        
-    }, [messages,groupid,user._id])
+        if (unreadmessageids.length > 0 && socket) {
+            socket.emit("markasread-group", {
+                messageids: unreadmessageids,
+                groupid
+            })
+        }
+
+    }, [messages, groupid, user._id])
 
 
     const renderreadstatus = (message) => {
         if (message.sender._id?.toString() !== user._id) return null;
-       
+
 
 
         return (
             <div className='text-right mt-1'>
-                <span className={`text-xs ${message.read  ? "text-green-500 font-medium" : "text-gray-400"}`}>
-                    {message.read  ? "Seen" : "Sent"}
+                <span className={`text-xs ${message.read ? "text-green-500 font-medium" : "text-gray-400"}`}>
+                    {message.read ? "Seen" : "Sent"}
                 </span>
             </div>
         )
@@ -363,8 +372,8 @@ function Groupchat() {
                         ))}
                     </div>
                 )}
-                  
-                  {renderreadstatus(message)}
+
+               
 
             </div>
 
@@ -375,6 +384,9 @@ function Groupchat() {
     const handledoubleclick = (messageid) => {
         setselectedmsg(messageid)
         setshowemojipicker(true)
+        setdel(false)
+        setshowedit(false)
+        setshowcancel(false)
     }
 
     const hamdleemojiclick = (emojidata) => {
@@ -395,14 +407,14 @@ function Groupchat() {
 
     const search = async (text) => {
         try {
-         setsearchtext(text)
-            if(text.trim() === ""){
-               setseachedmsg([])
-            }else{
+            setsearchtext(text)
+            if (text.trim() === "") {
+                setseachedmsg([])
+            } else {
                 const res = await api.get(`/search/group`, { params: { q: text.trim() || undefined } })
                 //  setmessages(res.data)
                 setseachedmsg(res.data)
-    
+
             }
 
 
@@ -411,6 +423,59 @@ function Groupchat() {
         }
     }
 
+    const handledel = (messageid) => {
+        setselectedmsg(messageid)
+        setdel(true)
+    }
+
+    const msgdelete = async (messageid) => {
+        setmessages(prev => prev.filter((msg) => msg._id !== messageid))
+        await api.delete(`/groupmsg/${messageid}`)
+
+        setdel(false)
+    }
+
+    const handleclick = (messagesid) => {
+        if (clicktimeout !== null) {
+            clearTimeout(clicktimeout)
+            clicktimeout = null;
+            handledoubleclick(messagesid)
+        } else {
+            clicktimeout = setTimeout(() => {
+                handledel(messagesid)
+                handledit(messagesid)
+                handlecancel(messagesid)
+                clicktimeout = null;
+
+            }, 250);
+        }
+    }
+
+    const handlecancel = (messageid) => {
+        setselectedmsg(messageid)
+        setshowcancel(true)
+    }
+
+    const handledit = (messageid) => {
+        setselectedmsg(messageid)
+        setshowedit(true)
+
+    }
+
+    const msgedit = async (messageid) => {
+        const upsatedmsg = await api.put(`/groupmsg/${messageid}`, { edittext })
+        setmessages(prev => prev.map((msg) => msg._id?.toString() === upsatedmsg.data?._id?.toString() ? upsatedmsg.data : msg))
+        setshowedit(false)
+        setedittext("")
+        seteditbox(false)
+        setdel(false)
+        setshowcancel(false)
+
+
+    }
+
+
+
 
 
     return (
@@ -418,41 +483,98 @@ function Groupchat() {
             <div className='p-4 border-b'>
                 <h1 className='text-xl font-bold '>{group?.name}</h1>
                 <p className='text-sm text-gray-500'>{group?.members?.length} members</p>
-                
+
             </div>
 
             <Input type={Text} className="w-[600px] mx-auto mt-2 " onChange={(e) => {
-               search(e.target.value)
-                 }}   value={searchtext} placeholder="Search Group Messages" />
+                search(e.target.value)
+            }} value={searchtext} placeholder="Search Group Messages" />
 
-                 <IoMdSearch  className="text-2xl relative left-[1023px] bottom-[30px]"  />
+            <IoMdSearch className="text-2xl relative left-[1023px] bottom-[30px]" />
 
 
-            <div className='flex-1 overflow-y-auto p-4 space-y-4 ' style={{ scrollbarWidth: "none" }} >
+            <div className={`flex-1 overflow-y-auto p-4 space-y-4  ${editbox ? "backdrop: blur-sm" : ""} transition-all `} style={{ scrollbarWidth: "none" }} >
                 {
-                   ( searchtext ? searchedmsg : messages).map((message) => (
+                    (searchtext ? searchedmsg : messages).map((message) => (
 
-                        <div key={message._id} className={`flex ${message.sender._id?.toString() === user._id ? "justify-end" : "justify-start"}`}
-                            onDoubleClick={() => handledoubleclick(message._id?.toString())}
+                        <div key={message._id} className={`flex ${message.sender._id?.toString() === user._id ? "justify-end" : "justify-start"} transition-all`}
+                            onClick={() => handleclick(message._id?.toString())}
                             ref={emojiPickerref}
                         >
 
                             {message.file ? renderfilemessage(message) : rendertextmessage(message)}
-                            
+
 
                             {
-                                showemojipicker && selectedmsg === message._id && (
+                                showemojipicker && selectedmsg === message._id?.toString() && (
                                     <div className='absolute bottom-[11%] mb-4  right-162 z-10 shadow-lg'>
                                         <EmojiPicker onEmojiClick={hamdleemojiclick} width={300} height={350} previewConfig={{ showPreview: false }} />
                                     </div>
                                 )
                             }
 
+
+                            <div className='flex flex-col gap-1'>
+
+
+
+                                {
+                                    del && selectedmsg === message._id?.toString() && message.sender._id?.toString() === user._id && (
+
+                                        <MdDelete onClick={() => msgdelete(message._id?.toString())} className='relative  transition-all ' />
+                                    )
+                                }
+
+
+                                {
+                                    showedit && message.sender._id?.toString() === user._id && selectedmsg === message._id?.toString() && (
+                                        <FaEdit className='relative left-[2px]   transition-all ' onClick={() => seteditbox(true)} />
+                                    )
+                                }
+
+
+                                {
+                                    showcancel && selectedmsg === message._id?.toString() && message.sender._id?.toString() === user._id && (
+                                        <MdCancel onClick={(e) => {
+                                            e.stopPropagation()
+                                            setselectedmsg(null)
+                                            setdel(false)
+                                            setshowedit(false)
+                                            setshowcancel(false)
+
+                                        }}
+
+                                            className='relative    transition-all ' />
+                                    )
+                                }
+                            </div>
+
                         </div>
 
                     ))}
                 <div ref={messageendref} />
             </div>
+
+
+
+            {
+                editbox && (
+                    <div className='flex justify-center'>
+                        <div className='z-100 relative bottom-62 ' >
+                            <Textarea onChange={(e) => setedittext(e.target.value)} value={edittext} placeholder="Enter text..." className=" w-80 h-40 bg-white " />
+                            <Button onClick={() => msgedit(selectedmsg)} className="mt-2" >Edit</Button>
+                            <Button onClick={() => {
+                                seteditbox(false)
+                                setdel(false)
+                                setshowedit(false)
+                                setedittext("")
+                                setshowcancel(false)
+                            }} className="ml-2" >Cancel</Button>
+                        </div>
+                    </div>
+
+                )
+            }
 
             {
                 filepreview && (
