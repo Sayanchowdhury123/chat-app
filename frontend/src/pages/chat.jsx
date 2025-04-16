@@ -60,6 +60,30 @@ function Chat() {
     }, [contactid])
 
 
+    useEffect(() => {
+      
+  socket.on("receive-file", (updatedfile) => {
+    setmessages(prev => prev.map((msg) => msg._id === updatedfile?._id ? updatedfile : msg))
+  })
+
+  socket.on("receive-putmsg", (textupdated) => {
+    setmessages(prev => prev.map((msg) => msg._id === textupdated?._id ? textupdated : msg))
+  })
+
+
+  return () => {
+    socket.off("receive-file")
+    socket.off("receive-putmsg")
+  }
+    },[])
+
+    useEffect(() => {
+         if(!editfile) return;
+         changingfile();
+
+    },[editfile])
+
+
     const fetchmessages = async () => {
         try {
             const res = await api.get(`/messages/${contactid}`);
@@ -129,11 +153,7 @@ function Chat() {
             uploadfile()
             setfilepreview(null)
 
-        } else if(editfile){
-           changingfile()
-           setfilepreview(null)
-           setfilechange(false)
-        } else {
+        }  else {
             const message = {
                 sender: user._id,
                 reciver: contactid,
@@ -201,6 +221,11 @@ function Chat() {
         setfile(null)
         setfilepreview(null)
         seteditfile(null)
+        setselectedmsg(null)
+        setshowcancel(false)
+        setshowedit(false)
+        setdel(false)
+        setfilechange(false)
         if (fileinputref.current) fileinputref.current.value = '';
 
     }
@@ -439,6 +464,8 @@ function Chat() {
 
     const msgedit = async (messageid) => {
         const upsatedmsg = await api.put(`/messages/${messageid}`, { edittext })
+        const textupdated = upsatedmsg.data;
+        socket.emit("send-putmsg", {room, textupdated})
         setmessages(prev => prev.map((msg) => msg._id === upsatedmsg.data._id ? upsatedmsg.data : msg))
         setshowedit(false)
         setedittext("")
@@ -459,7 +486,8 @@ function Chat() {
             return;
         }
         seteditfile(selectedfile)
-
+        
+         
     }
 
 
@@ -469,20 +497,13 @@ function Chat() {
         try {
             const formdata = new FormData();
             formdata.append("file", editfile)
-            formdata.append("userid", user._id)
-            formdata.append("room", room)
-            formdata.append("contactid", contactid)
             formdata.append("messageid", selectedmsg)
+            console.log(formdata);
 
-            const res = await api.put('/upload', formdata, {
-                headers: {
-                    "Content-Type": "multipart/form-data"
-                }
-            })
-
+            const res = await api.put('/upload', formdata)
+            const updatedfile = res.data;
+            socket.emit("send-file", {room, updatedfile})
             setmessages(prev => prev.map((msg) => msg._id === selectedmsg ? res.data : msg))
-
-
 
             clearfile()
         } catch (error) {

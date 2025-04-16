@@ -90,7 +90,9 @@ app.post("/api/upload", upload.single("file"),async (req,res) => {
 app.put("/api/upload", upload.single("file"),async (req,res) => {
     try {
         
-       console.log(req.file);
+      if(!req.file){
+        res.status(4000).json({error: "no file recived"})
+      }
        const updatedfile = await Message.findByIdAndUpdate(req.body.messageid,
         {$set: 
             {file: {
@@ -102,9 +104,9 @@ app.put("/api/upload", upload.single("file"),async (req,res) => {
     }},
          {new: true}  )
 
-        
+           
        res.json(updatedfile)
-        console.log(updatedfile);
+    
         
     } catch (error) {
         console.log(error);
@@ -208,6 +210,17 @@ const activegroups = {};
 
 io.on("connection", (socket) => {
     console.log("user connected");
+
+
+    //file updating
+    socket.on("send-file", ({room,updatedfile}) => {
+       io.to(room).emit("receive-file", updatedfile)
+    })
+
+    //text updating
+    socket.on("send-putmsg", ({room,textupdated}) => {
+        io.to(room).emit("receive-putmsg", textupdated)
+    })
 
 
     //emoji rection
