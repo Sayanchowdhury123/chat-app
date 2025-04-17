@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import toast from 'react-hot-toast';
 
 function Login() {
 const[username,setusername] = useState("")
@@ -16,6 +17,7 @@ const[username,setusername] = useState("")
     try {
       await login(username, password)
       navigate("/")
+      toast.success("Logged in Successfully")
     } catch (error) {
       console.log(error);
     }

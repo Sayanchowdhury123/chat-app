@@ -12,6 +12,7 @@ import Contacts from './pages/contacts'
 import Grouplist from './pages/grouplist'
 import Groupchatpage from './pages/groupchatform'
 import Groupchat from './pages/groupchat'
+import { Toaster } from 'react-hot-toast'
 
 
 
@@ -23,6 +24,7 @@ const {isauthinticated} = useAuth();
 
 
  <Router>
+  <Toaster/>
   <Routes>
     <Route path='/login'  element={<Login/>} />
     <Route path='/register' element={<Register/>} />

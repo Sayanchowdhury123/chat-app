@@ -223,6 +223,11 @@ io.on("connection", (socket) => {
     })
 
 
+    //text deleteing
+    socket.on("del-msg", ({messageid,room}) => {
+        io.to(room).emit("del", messageid)
+    })
+
     //emoji rection
 socket.on("addreaction", async ({messageid,emoji,userid}) => {
     try {

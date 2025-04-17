@@ -2,6 +2,7 @@ import axios from "axios";
 import { createContext, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api";
+import toast from "react-hot-toast";
 export const Authcontext = createContext();
 
 export const Authprovider = ({children}) => {
@@ -45,7 +46,7 @@ const login = async (username,password) => {
         setisauthincated(true)
          fetchuser();
        
-        alert("you are logged in")
+        //alert("you are logged in")
         
         
    
@@ -56,8 +57,8 @@ const register = async (username,password) => {
     
     const res = await axios.post("http://localhost:5000/api/auth/register", {username,password});
   
-    
-    alert("you have registered successfully")
+    toast.success("registered successfully")
+    //alert("you have registered successfully")
     
     
 }
@@ -69,6 +70,7 @@ const logout = () =>{
     setisauthincated(false)
 
     setuser(null)
+    toast.success("Logged Out")
 
 }
 

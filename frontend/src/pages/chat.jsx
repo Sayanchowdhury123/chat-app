@@ -15,6 +15,8 @@ import { MdDelete } from "react-icons/md";
 import { FaEdit } from "react-icons/fa";
 import { Textarea } from '@/components/ui/textarea';
 import { MdCancel } from "react-icons/md";
+import { Tooltip } from '@mui/material';
+import toast from 'react-hot-toast';
 
 
 function Chat() {
@@ -46,8 +48,8 @@ function Chat() {
     const [showedit, setshowedit] = useState(false)
     const [editbox, seteditbox] = useState(false)
     const [showcancel, setshowcancel] = useState(false)
-    const [editfile,seteditfile] = useState(null)
-    const [filechange,setfilechange] = useState(false)
+    const [editfile, seteditfile] = useState(null)
+    const [filechange, setfilechange] = useState(false)
 
 
 
@@ -61,27 +63,33 @@ function Chat() {
 
 
     useEffect(() => {
-      
-  socket.on("receive-file", (updatedfile) => {
-    setmessages(prev => prev.map((msg) => msg._id === updatedfile?._id ? updatedfile : msg))
-  })
 
-  socket.on("receive-putmsg", (textupdated) => {
-    setmessages(prev => prev.map((msg) => msg._id === textupdated?._id ? textupdated : msg))
-  })
+        socket.on("receive-file", (updatedfile) => {
+            setmessages(prev => prev.map((msg) => msg._id === updatedfile?._id ? updatedfile : msg))
+        })
+
+        socket.on("receive-putmsg", (textupdated) => {
+            setmessages(prev => prev.map((msg) => msg._id === textupdated?._id ? textupdated : msg))
+        })
+
+        socket.on("del", (messageid) => {
+            setmessages(prev => prev.filter((msg) => msg._id !== messageid))
+        })
 
 
-  return () => {
-    socket.off("receive-file")
-    socket.off("receive-putmsg")
-  }
-    },[])
+        return () => {
+            socket.off("receive-file")
+            socket.off("receive-putmsg")
+            socket.off("del")
+        }
+    }, [])
 
     useEffect(() => {
-         if(!editfile) return;
-         changingfile();
+        if (!editfile) return;
+        changingfile();
+        toast.success("File Edited")
 
-    },[editfile])
+    }, [editfile])
 
 
     const fetchmessages = async () => {
@@ -152,8 +160,9 @@ function Chat() {
         if (file) {
             uploadfile()
             setfilepreview(null)
+            toast.success("Photo Sent")
 
-        }  else {
+        } else {
             const message = {
                 sender: user._id,
                 reciver: contactid,
@@ -163,6 +172,7 @@ function Chat() {
             socket.emit("sendmessage", { room, message })
             setnewmessage("")
             handletyping(false)
+            toast.success("Message Sent")
         }
 
     }
@@ -256,7 +266,7 @@ function Chat() {
     }
 
 
-  
+
 
 
     const renderfilemessage = (message) => {
@@ -429,10 +439,12 @@ function Chat() {
     }
 
     const msgdelete = async (messageid) => {
+        toast.success("Message Deleted")
+        socket.emit("del-msg", { room, messageid })
         setmessages(prev => prev.filter((msg) => msg._id !== messageid))
         await api.delete(`/messages/${messageid}`)
-
         setdel(false)
+      
     }
 
     const handleclick = (messagesid) => {
@@ -465,13 +477,14 @@ function Chat() {
     const msgedit = async (messageid) => {
         const upsatedmsg = await api.put(`/messages/${messageid}`, { edittext })
         const textupdated = upsatedmsg.data;
-        socket.emit("send-putmsg", {room, textupdated})
+        socket.emit("send-putmsg", { room, textupdated })
         setmessages(prev => prev.map((msg) => msg._id === upsatedmsg.data._id ? upsatedmsg.data : msg))
         setshowedit(false)
         setedittext("")
         seteditbox(false)
         setdel(false)
         setshowcancel(false)
+        toast.success("Message Edited")
 
 
     }
@@ -486,8 +499,8 @@ function Chat() {
             return;
         }
         seteditfile(selectedfile)
-        
-         
+
+
     }
 
 
@@ -502,7 +515,7 @@ function Chat() {
 
             const res = await api.put('/upload', formdata)
             const updatedfile = res.data;
-            socket.emit("send-file", {room, updatedfile})
+            socket.emit("send-file", { room, updatedfile })
             setmessages(prev => prev.map((msg) => msg._id === selectedmsg ? res.data : msg))
 
             clearfile()
@@ -519,7 +532,7 @@ function Chat() {
 
     if (loading) return <div className='p-4'>Loading message...</div>
     return (
-        <div className=' flex flex-col h-screen p-6'>
+        <div className=' flex flex-col h-screen p-6 transition-all'>
 
             <Input type={Text} className="w-[600px] mx-auto " onChange={(e) => {
                 search(e.target.value)
@@ -537,14 +550,14 @@ function Chat() {
 
                 {
                     (searchtext ? searchedmsg : messages).map((message) => (
-                        <div key={message._id} className={`flex ${message.sender === user._id ? "justify-end" : "justify-start"} transition-all `}
+                        <div key={message._id} className={`flex ${message.sender === user._id ? "justify-end" : "justify-start"} transition-all   `}
                             onClick={() => handleclick(message._id)} >
 
                             {message.file ? renderfilemessage(message) : rendertextmessage(message)}
 
                             {
                                 showemojipicker && selectedmsg === message._id && (
-                                    <div className='absolute bottom-[11%] mb-4  z-10 shadow-lg'>
+                                    <div className='absolute bottom-[11%] mb-4  z-10 shadow-lg transition-all'>
                                         <EmojiPicker onEmojiClick={hamdleemojiclick} width={300} height={350} previewConfig={{ showPreview: false }} />
                                     </div>
                                 )
@@ -552,48 +565,58 @@ function Chat() {
 
 
 
-                            <div className='flex flex-col gap-1'>
+                            <div className='flex flex-col gap-3  top-1 transition-all mr-2 relative left-1'>
 
 
 
                                 {
                                     del && selectedmsg === message._id && message.sender === user._id && (
+                                        <Tooltip title="Delete" placement='left'>
+                                            <MdDelete onClick={() => msgdelete(message._id)} className='relative  transition-all ' />
+                                        </Tooltip>
 
-                                        <MdDelete onClick={() => msgdelete(message._id)} className='relative  transition-all ' />
                                     )
                                 }
 
 
                                 {
                                     showedit && message.sender === user._id && selectedmsg === message._id && message.message && (
-                                        <FaEdit className='relative left-[2px]    transition-all ' onClick={() => seteditbox(true)} />
+                                        <Tooltip title="Edit" placement='left'>
+                                            <FaEdit className='relative left-[2px]    transition-all ' onClick={() => seteditbox(true)} />
+                                        </Tooltip>
+
                                     )
                                 }
 
-{
+                                {
                                     showedit && message.sender === user._id && selectedmsg === message._id && message.file && (
-                                        <FaEdit className='relative left-[2px]    transition-all ' onClick={() => 
-                                            {
+
+                                        <Tooltip  title="Edit file" placement='left'>
+                                            <FaEdit className='relative left-[2px]    transition-all ' onClick={() => {
                                                 fileinputref.current.click()
                                                 setfilechange(true)
                                                 setselectedmsg(message._id)
                                             }} />
+                                        </Tooltip>
+
                                     )
                                 }
 
 
                                 {
                                     showcancel && selectedmsg === message._id && message.sender === user._id && (
-                                        <MdCancel onClick={(e) => {
+                                       <Tooltip title="Cancel" placement='left'>
+                                                <MdCancel onClick={(e) => {
                                             e.stopPropagation()
                                             setselectedmsg(null)
                                             setdel(false)
                                             setshowedit(false)
                                             setshowcancel(false)
 
-                                        }}
-
-                                            className='relative    transition-all ' />
+                                        }} className='relative    transition-all '
+                                         />
+                                       </Tooltip>
+                                      
                                     )
                                 }
                             </div>
@@ -687,7 +710,7 @@ function Chat() {
 
                 <div className='flex items-center space-x-2'>
 
-                    <input type="file" ref={fileinputref} onChange={ filechange ? handlechangedfile : handlefilechange} accept="image/*,video/*,.pdf,.doc,docx" className="hidden" id="file-upload" />
+                    <input type="file" ref={fileinputref} onChange={filechange ? handlechangedfile : handlefilechange} accept="image/*,video/*,.pdf,.doc,docx" className="hidden" id="file-upload" />
                     <label htmlFor="file-upload" className='p-2 text-gray-500 rounded-full hover:bg-gray-100 cursor-pointer'>
                         <FaPaperclip />
                     </label>
