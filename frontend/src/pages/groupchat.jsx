@@ -12,6 +12,8 @@ import { MdDelete } from "react-icons/md";
 import { FaEdit } from "react-icons/fa";
 import { Textarea } from '@/components/ui/textarea';
 import { MdCancel } from "react-icons/md";
+import { Tooltip } from '@mui/material';
+import toast from 'react-hot-toast';
 
 function Groupchat() {
     const { groupid } = useParams();
@@ -41,7 +43,39 @@ function Groupchat() {
     const [showedit, setshowedit] = useState(false)
     const [editbox, seteditbox] = useState(false)
     const [showcancel, setshowcancel] = useState(false)
+    const [editfile, seteditfile] = useState(null)
+    const [filechange, setfilechange] = useState(false)
 
+
+    useEffect(() => {
+        if (!editfile) return;
+        changingfile();
+        toast.success("File Edited")
+
+    }, [editfile])
+
+
+    useEffect(() => {
+
+        socket.on("receive-file-grp", (updatedfile) => {
+            setmessages(prev => prev.map((msg) => msg._id?.toString() === updatedfile?._id ? updatedfile : msg))
+        })
+
+        socket.on("receive-putmsg-grp", (textupdated) => {
+            setmessages(prev => prev.map((msg) => msg._id?.toString() === textupdated?._id ? textupdated : msg))
+        })
+
+        socket.on("del-grp", (messageid) => {
+            setmessages(prev => prev.filter((msg) => msg._id?.toString() !== messageid))
+        })
+
+
+        return () => {
+            socket.off("receive-file-grp")
+            socket.off("receive-putmsg-grp")
+            socket.off("del-grp")
+        }
+    }, [])
 
     useEffect(() => {
         const fetchdata = async () => {
@@ -58,6 +92,12 @@ function Groupchat() {
             }
         }
         fetchdata();
+
+
+    
+
+
+      
 
 
         socket.on("usertyping", ({ userids }) => {
@@ -210,6 +250,13 @@ function Groupchat() {
     const clearfile = () => {
         setfile(null)
         setfilepreview(null)
+        seteditfile(null)
+        setselectedmsg(null)
+        setshowcancel(false)
+        setshowedit(false)
+        setdel(false)
+        setfilechange(false)
+
         if (fileinputref.current) fileinputref.current.value = '';
 
     }
@@ -253,7 +300,7 @@ function Groupchat() {
             return (
                 <div className='max-w-xs md:max-w-md'>
                     <p className={`text-sm font-medium`}>
-                        {message.sender._id === user._id ? "you" : message.sender.username}
+                        {message.sender._id?.toString() === user._id ? "you" : message.sender.username}
                     </p>
                     <img src={`http://localhost:5000/${file.path}`} alt={file.name} className='rounded-lg shadow-sm' />
                     <div className='flex items-center justify-end mt-1 space-x-1'>
@@ -282,7 +329,7 @@ function Groupchat() {
             return (
                 <div className='max-w-xs md:max-w-md'>
                     <p className={`text-sm font-medium`}>
-                        {message.sender._id === user._id ? "you" : message.sender.username}
+                        {message.sender._id?.toString() === user._id ? "you" : message.sender.username}
                     </p>
                     <video controls className='rounded-lg shadow-sm' >
                         <source src={`http://localhost:5000/${file.path}`} type={file.type} />
@@ -312,7 +359,7 @@ function Groupchat() {
         return (
             <div className='max-w-xs p-3 bg-gray-100 rounded-lg shadow-sm'>
                 <p className={`text-sm font-medium`}>
-                    {message.sender._id === user._id ? "you" : message.sender.username}
+                    {message.sender._id?.toString() === user._id ? "you" : message.sender.username}
                 </p>
                 <a href={`http://localhost:5000/${file.path}`} download={message.filename} className='flex items-center space-x-2' >
                     <div className='p-2 bg-white rounded'>
@@ -373,7 +420,7 @@ function Groupchat() {
                     </div>
                 )}
 
-               
+
 
             </div>
 
@@ -429,6 +476,8 @@ function Groupchat() {
     }
 
     const msgdelete = async (messageid) => {
+        toast.success("Message Deleted")
+        socket.emit("del-msg-grp", { groupid, messageid })
         setmessages(prev => prev.filter((msg) => msg._id !== messageid))
         await api.delete(`/groupmsg/${messageid}`)
 
@@ -464,18 +513,56 @@ function Groupchat() {
 
     const msgedit = async (messageid) => {
         const upsatedmsg = await api.put(`/groupmsg/${messageid}`, { edittext })
+        const textupdated = upsatedmsg.data;
+        socket.emit("send-putmsg-grp", { groupid, textupdated })
         setmessages(prev => prev.map((msg) => msg._id?.toString() === upsatedmsg.data?._id?.toString() ? upsatedmsg.data : msg))
         setshowedit(false)
         setedittext("")
         seteditbox(false)
         setdel(false)
         setshowcancel(false)
+         toast.success("Message Edited")
 
 
     }
 
 
+    const handlechangedfile = (e) => {
+        console.log("changed file");
+        const selectedfile = e.target.files[0];
+        if (!selectedfile) return;
 
+        if (selectedfile.size > max_size) {
+            alert("file size exceeds 10Mb")
+            return;
+        }
+        seteditfile(selectedfile)
+
+
+    }
+
+
+    const changingfile = async () => {
+        if (!editfile) return;
+
+        try {
+            const formdata = new FormData();
+            formdata.append("file", editfile)
+            formdata.append("messageid", selectedmsg)
+            console.log(formdata);
+
+            const res = await api.put('/upload/grp', formdata)
+            const updatedfile = res.data;
+            socket.emit("send-file-grp", { groupid, updatedfile })
+            setmessages(prev => prev.map((msg) => msg._id?.toString() === selectedmsg ? res.data : msg))
+          
+
+            clearfile()
+        } catch (error) {
+            console.log("upload failed", error);
+        }
+
+    }
 
 
     return (
@@ -507,44 +594,67 @@ function Groupchat() {
 
                             {
                                 showemojipicker && selectedmsg === message._id?.toString() && (
-                                    <div className='absolute bottom-[11%] mb-4  right-162 z-10 shadow-lg'>
+                                    <div className='absolute bottom-[11%] mb-4   z-10 shadow-lg'>
                                         <EmojiPicker onEmojiClick={hamdleemojiclick} width={300} height={350} previewConfig={{ showPreview: false }} />
                                     </div>
                                 )
                             }
 
 
-                            <div className='flex flex-col gap-1'>
+                            <div className={`flex flex-col relative gap-3 mr-2 left-1 ${message.file ? "relative top-5" : "top-1"}`}>
 
 
 
                                 {
                                     del && selectedmsg === message._id?.toString() && message.sender._id?.toString() === user._id && (
+                                        <Tooltip title="Delete" placement='left'>
+                                            <MdDelete onClick={() => msgdelete(message._id?.toString())} className='relative  transition-all ' />
+                                        </Tooltip>
 
-                                        <MdDelete onClick={() => msgdelete(message._id?.toString())} className='relative  transition-all ' />
                                     )
                                 }
 
 
                                 {
-                                    showedit && message.sender._id?.toString() === user._id && selectedmsg === message._id?.toString() && (
-                                        <FaEdit className='relative left-[2px]   transition-all ' onClick={() => seteditbox(true)} />
+                                    showedit && message.sender._id?.toString() === user._id && selectedmsg === message._id?.toString() && message.message && (
+                                        <Tooltip title="Edit" placement='left'>
+                                            <FaEdit className='relative left-[2px]   transition-all ' onClick={() => seteditbox(true)} />
+                                        </Tooltip>
+
+                                    )
+                                }
+
+
+                                {
+                                    showedit && message.sender._id?.toString() === user._id && selectedmsg === message._id?.toString() && message.file && (
+
+                                        <Tooltip title="Edit file" placement='left'>
+                                            <FaEdit className='relative left-[2px]    transition-all ' onClick={() => {
+                                                fileinputref.current.click()
+                                                setfilechange(true)
+                                                setselectedmsg(message._id?.toString())
+                                            }} />
+                                        </Tooltip>
+
                                     )
                                 }
 
 
                                 {
                                     showcancel && selectedmsg === message._id?.toString() && message.sender._id?.toString() === user._id && (
-                                        <MdCancel onClick={(e) => {
-                                            e.stopPropagation()
-                                            setselectedmsg(null)
-                                            setdel(false)
-                                            setshowedit(false)
-                                            setshowcancel(false)
+                                        <Tooltip title="Cancel" placement='left'>
+                                            <MdCancel onClick={(e) => {
+                                                e.stopPropagation()
+                                                setselectedmsg(null)
+                                                setdel(false)
+                                                setshowedit(false)
+                                                setshowcancel(false)
 
-                                        }}
+                                            }}
 
-                                            className='relative    transition-all ' />
+                                                className='relative    transition-all ' />
+                                        </Tooltip>
+
                                     )
                                 }
                             </div>
@@ -633,7 +743,7 @@ function Groupchat() {
             <div className='p-4 bg-white border-t'>
                 <div className='flex items-center space-x-2'>
 
-                    <input type="file" ref={fileinputref} onChange={handlefilechange} accept="image/*,video/*,.pdf,.doc,docx" className="hidden" id="file-upload" />
+                    <input type="file" ref={fileinputref} onChange={filechange ? handlechangedfile : handlefilechange} accept="image/*,video/*,.pdf,.doc,docx" className="hidden" id="file-upload" />
                     <label htmlFor="file-upload" className='p-2 text-gray-500 rounded-full hover:bg-gray-100 cursor-pointer'>
                         <FaPaperclip />
                     </label>

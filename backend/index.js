@@ -114,6 +114,33 @@ app.put("/api/upload", upload.single("file"),async (req,res) => {
     }
 } )
 
+app.put("/api/upload/grp", upload.single("file"),async (req,res) => {
+    try {
+        
+      if(!req.file){
+        res.status(4000).json({error: "no file recived"})
+      }
+       const updatedfile = await Groupmessages.findByIdAndUpdate(req.body.messageid,
+        {$set: 
+            {file: {
+            name:req.file.originalname,
+            path: req.file.path,
+            type: req.file.mimetype,
+            size: req.file.size
+        }
+    }},
+         {new: true}  ).populate("sender", "username")
+
+           
+       res.json(updatedfile)
+    
+        
+    } catch (error) {
+        console.log(error);
+        res.status(400).json({error: error})
+    }
+} )
+
 
 
 
@@ -210,7 +237,23 @@ const activegroups = {};
 
 io.on("connection", (socket) => {
     console.log("user connected");
+ 
 
+    //file updaing grp
+    socket.on("send-file-grp", ({groupid,updatedfile}) => {
+        io.to(`group_${groupid}`).emit("receive-file-grp", updatedfile)
+     })
+
+     //text updating grp
+     socket.on("send-putmsg-grp", ({groupid,textupdated}) => {
+        io.to(`group_${groupid}`).emit("receive-putmsg-grp", textupdated)
+     })
+
+
+      //text deleteing
+    socket.on("del-msg-grp", ({messageid,groupid}) => {
+        io.to(`group_${groupid}`).emit("del-grp", messageid)
+    })
 
     //file updating
     socket.on("send-file", ({room,updatedfile}) => {
